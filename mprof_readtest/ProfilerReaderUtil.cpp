@@ -5,6 +5,8 @@ if (!s || feof(s)) return false; \
 }while (0)
 
 
+std::map<unsigned int, Profile_Mapping::Class_Info> g_class_mapping; 
+
 bool ProfilerReaderUtil::ReadUShort(FILE* stream, unsigned short& val)
 {
 	VERIFY_STREAM(stream);
@@ -52,33 +54,45 @@ bool ProfilerReaderUtil::ReadBuffer(FILE* stream, void* buf, unsigned int size)
 }
 
 
-bool ProfilerReaderUtil::ReadBlockHeader(FILE* stream, Profile_Block_Header_t& val)
-{
-	VERIFY_STREAM(stream);
-	bool rs = false;
-	rs = ReadUShort(stream, val.code);
-	rs = ReadUInt(stream, val.size);
-	rs = ReadUInt(stream, val.counter_delta);
-	return rs;
-}
+ 
 
-bool ProfilerReaderUtil::ReadBlock(FILE* stream, Profile_Block_t& val)
-{
-	VERIFY_STREAM(stream);
-	bool rs = false;
-	rs = ReadBlockHeader(stream, val.head);
-	if (!rs) return false;
+Profile_Block* ProfilerReaderUtil::ReadBlock(FILE* stream)
+{ 
+	if (NULL == stream || feof(stream))
+		return NULL;
 
-	if (val.pbuf)
+	unsigned short blockType = 0;
+	bool rs = false;
+	rs = ReadUShort(stream, blockType);
+	//回退两个字节
+	fseek(stream,ftell(stream)-2,SEEK_SET); 
+	if (!rs) return NULL;
+	printf("%s\n", MonoProfilerFileBlockKindMap(blockType).c_str());
+	Profile_Block* pBlock = ProfileBlockFactory(blockType);
+	if (!pBlock)
 	{
-		delete[] val.pbuf;
-		val.pbuf = NULL;
+		SkipBlock(stream);
+		return NULL;
 	}
-	val.pbuf = new unsigned char[val.head.size];
-	rs = ReadBuffer(stream, val.pbuf, val.head.size);
-	return rs;
+	
+	pBlock->InitFromStream(stream); 
+
+	return pBlock;
 }
 
+void ProfilerReaderUtil::SkipBlock(FILE* stream)
+{
+	unsigned short blockType = 0;
+	unsigned int   blockSize = 0;
+	unsigned int   blockCounterDelta = 0;
+
+	ReadUShort(stream, blockType);
+	ReadUInt(stream, blockSize);
+	ReadUInt(stream, blockCounterDelta);
+	fseek(stream, blockSize, SEEK_CUR);
+}
+
+ 
 std::string MonoProfilerFileBlockKindMap(unsigned int code)
 {
 	switch (code)
@@ -117,4 +131,179 @@ std::string MonoProfilerFileBlockKindMap(unsigned int code)
 			break;
 	}
 	return "KIND_UNKNOWN";
+}
+
+Profile_Block* ProfileBlockFactory(unsigned int type)
+{
+	Profile_Block* pBlock = NULL;
+	switch (type)
+	{
+	case MONO_PROFILER_FILE_BLOCK_KIND_INTRO: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_END: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_MAPPING: 
+		pBlock = new Profile_Mapping;
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_LOADED: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_UNLOADED: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_EVENTS: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA: 
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY: 
+		pBlock = new Profile_Heapshot_Summary;
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES: 
+		break;
+	default:
+		break;
+	}
+
+	if (!pBlock)
+	{
+		pBlock = new Profile_Raw_Block;
+	}
+	return pBlock;
+}
+
+Profile_Heapshot_Summary::Profile_Heapshot_Summary():
+Profile_Block(),
+start_counter(0),
+start_time(0),
+collection(0),
+mapping(NULL)
+{ 
+}
+
+bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
+{
+	if (!Profile_Block::InitFromStream(stream))
+		return false;
+
+	VERIFY_STREAM(stream);
+	ProfilerReaderUtil::ReadUInt64(stream, start_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, start_time);
+	ProfilerReaderUtil::ReadUInt(stream, collection);
+
+	while (1)
+	{
+		unsigned int class_id = 0;
+		ProfilerReaderUtil::ReadUInt(stream, class_id);
+		if (!class_id)
+			break;
+		Summary_Item item;
+		item.class_id = class_id;
+		ProfilerReaderUtil::ReadUInt(stream,item.reachable_insts);
+		ProfilerReaderUtil::ReadUInt(stream, item.reachable_bytes);
+		ProfilerReaderUtil::ReadUInt(stream, item.unreachable_insts);
+		ProfilerReaderUtil::ReadUInt(stream, item.unreachable_bytes);
+		items.push_back(item);
+	}
+
+	ProfilerReaderUtil::ReadUInt64(stream, end_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, end_time); 
+
+	return true;
+
+}
+
+
+
+bool Profile_Block::InitFromStream(FILE* stream)
+{
+	VERIFY_STREAM(stream);
+	ProfilerReaderUtil::ReadUShort(stream,code);
+	ProfilerReaderUtil::ReadUInt(stream,size);
+	ProfilerReaderUtil::ReadUInt(stream,counter_delta);
+	return true;
+}
+
+bool Profile_Raw_Block::InitFromStream(FILE* stream)
+{
+	if (!Profile_Block::InitFromStream(stream))
+		return false;
+
+	VERIFY_STREAM(stream);
+	if (pBuf)
+	{
+		delete[] pBuf;
+		pBuf = NULL;
+	}
+	pBuf = new unsigned char[size];
+	ProfilerReaderUtil::ReadBuffer(stream, pBuf, size);
+	return true;
+
+}
+
+Profile_Raw_Block::~Profile_Raw_Block()
+{
+	if (pBuf)
+	{
+		delete[] pBuf;
+		pBuf = NULL;
+	}
+}
+
+Profile_Mapping::Profile_Mapping() :
+Profile_Block(),
+start_counter(0),
+start_time(0),
+end_counter(0),
+end_time(0),
+thread_id(0)
+{ 
+}
+
+Profile_Mapping::~Profile_Mapping()
+{ 
+}
+
+bool Profile_Mapping::InitFromStream(FILE* stream)
+{
+	if (!Profile_Block::InitFromStream(stream))
+		return false;
+
+	VERIFY_STREAM(stream);
+	ProfilerReaderUtil::ReadUInt64(stream, start_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, start_time);
+	ProfilerReaderUtil::ReadUInt64(stream, thread_id);
+
+	while (1)
+	{
+		unsigned int class_id = 0;
+		ProfilerReaderUtil::ReadUInt(stream, class_id);
+		if (!class_id)
+			break;
+		Class_Info info; 
+		info.class_id = class_id;
+		ProfilerReaderUtil::ReadUInt(stream, info.assembly_id);
+		ProfilerReaderUtil::ReadString(stream, info.class_name); 
+		class_map.insert(std::make_pair(info.class_id, info));
+
+		//注册全局类信息
+		g_class_mapping.insert(std::make_pair(info.class_id, info));  
+	}
+
+	while (1)
+	{
+		unsigned int method_id = 0;
+		ProfilerReaderUtil::ReadUInt(stream, method_id);
+		if (!method_id)
+			break;
+		Method_Info info;
+		info.method_id = method_id;
+		ProfilerReaderUtil::ReadUInt(stream, info.class_id);
+		ProfilerReaderUtil::ReadUInt(stream, info.wrapper_type);
+		ProfilerReaderUtil::ReadString(stream, info.method_name);
+		method_map.insert(std::make_pair(info.method_id, info));
+	} 
+	ProfilerReaderUtil::ReadUInt64(stream, end_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, end_time); 
+
+	return true;
 }

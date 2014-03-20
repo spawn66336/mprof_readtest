@@ -2,6 +2,9 @@
 
 #include <stdio.h>
 #include <string>
+#include <vector>
+#include <map>
+#include <stack>
 
 typedef enum {
 	MONO_PROFILER_FILE_BLOCK_KIND_INTRO = 1,
@@ -16,10 +19,10 @@ typedef enum {
 	MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES = 10
 } MonoProfilerFileBlockKind;
 
-typedef struct _Profile_Block_Header
+class Profile_Block
 {
 public:
-	_Profile_Block_Header():
+	Profile_Block() :
 		code(0), 
 		size(0), 
 		counter_delta(0)
@@ -29,29 +32,85 @@ public:
 	unsigned short code;
 	unsigned int size;
 	unsigned int counter_delta;
-}Profile_Block_Header_t;
 
-typedef struct _Profile_Block
+	virtual bool InitFromStream(FILE* stream);
+};
+
+class Profile_Raw_Block : public Profile_Block
+{
+public:
+	Profile_Raw_Block():
+		Profile_Block(), pBuf(0){}
+	~Profile_Raw_Block();
+
+	virtual bool InitFromStream(FILE* stream);
+	
+	unsigned char* pBuf;
+};
+
+
+
+class Profile_Mapping : public Profile_Block
+{
+public:
+	typedef struct{
+		unsigned int class_id;
+		unsigned int assembly_id;
+		std::string  class_name;
+	}Class_Info;
+
+	typedef struct{
+		unsigned int method_id;
+		unsigned int class_id;
+		unsigned int wrapper_type;
+		std::string  method_name;
+	}Method_Info;
+
+	Profile_Mapping();
+	~Profile_Mapping();
+
+	virtual bool InitFromStream(FILE* stream);
+	 
+	unsigned __int64 start_counter;
+	unsigned __int64 start_time;
+	unsigned __int64 end_counter;
+	unsigned __int64 end_time; 
+	unsigned __int64 thread_id;
+	std::map<unsigned int, Class_Info> class_map;
+	std::map<unsigned int, Method_Info> method_map; 
+};
+
+class Profile_Heapshot_Summary : public Profile_Block
 {
 public:
 
-	_Profile_Block():
-		head(),
-		pbuf(0)
-	{ 
-	}
-	~_Profile_Block()
-	{
-		if (pbuf)
-		{
-			delete[] pbuf;
-			pbuf = NULL;
-		}
-	}
+	typedef struct{
+		unsigned int class_id;
+		unsigned int reachable_insts;
+		unsigned int reachable_bytes;
+		unsigned int unreachable_insts;
+		unsigned int unreachable_bytes;
+	}Summary_Item;
 
-	Profile_Block_Header_t head;
-	unsigned char* pbuf;
-}Profile_Block_t;
+	Profile_Heapshot_Summary();
+	~Profile_Heapshot_Summary(){}
+
+	virtual bool InitFromStream(FILE* stream);
+
+	unsigned __int64 start_counter;
+	unsigned __int64 start_time;
+	unsigned __int64 end_counter;
+	unsigned __int64 end_time;
+	unsigned int	 collection;
+	std::vector<Summary_Item> items;
+	Profile_Mapping* mapping;
+
+};
+
+
+Profile_Block* ProfileBlockFactory(unsigned int type);
+ 
+extern std::map<unsigned int, Profile_Mapping::Class_Info> g_class_mapping; 
 
 class ProfilerReaderUtil
 {
@@ -62,8 +121,10 @@ public:
 	static bool ReadUInt64(FILE* stream, unsigned __int64& val);
 	static bool ReadString(FILE* stream, std::string& val);
 	static bool ReadBuffer(FILE* stream, void* buf, unsigned int size);
-	static bool ReadBlockHeader(FILE* stream,Profile_Block_Header_t& val);
-	static bool ReadBlock(FILE* stream, Profile_Block_t& val);
+	static Profile_Block* ReadBlock(FILE* stream);
+
+private:
+	static void SkipBlock(FILE* stream);
 	
 };
 
