@@ -50,11 +50,48 @@ void PrintHeapShotSummary(FILE* pFile ,Profile_Block* pBlock)
 	}
 }
 
+void PrintHeapShotData(FILE* pFile, Profile_Block* pBlock)
+{
+	if (!pBlock) return;
+	if (pBlock->code == MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA)
+	{
+		fprintf(pFile, "***********************Heap Data***********************\n");
+		Profile_Heapshot_Data_Block* pHeapDataBlock = (Profile_Heapshot_Data_Block*)(pBlock);
+		auto itObj = pHeapDataBlock->objs.begin();
+		while (itObj != pHeapDataBlock->objs.end())
+		{
+			std::string className;
+			auto itClassInfo = g_class_mapping.find(itObj->second.class_id);
+			if (itClassInfo != g_class_mapping.end())
+			{
+				className = (*itClassInfo).second.class_name;
+			}
+			else{
+				className = "UNKNOWN";
+			}
+			fprintf(pFile, "%-50s [%p] refs=%d , size=%d\n",className.c_str(),
+				itObj->second.obj,
+				itObj->second.ref_count,
+				itObj->second.size);
+			
+			auto itRef = itObj->second.refs.begin();
+			while (itRef != itObj->second.refs.end())
+			{
+				fprintf(pFile, "\t\t\t\t[%p]\n",*itRef);
+				++itRef;
+			}
+
+			++itObj;
+		}
+		fprintf(pFile, "**********************************************************\n");
+	}
+}
+
 void main()
 {
 	vector<Profile_Block*> blocks;
 
-	FILE* pFile = fopen("HelloWorld.mprof", "rb"); 
+	FILE* pFile = fopen("profiler-log.mprof", "rb"); 
 	Profile_Block* pBlock = NULL;
 	while (pBlock = ProfilerReaderUtil::ReadBlock(pFile))
 	{ 
@@ -68,10 +105,14 @@ void main()
 	auto itBlock = blocks.begin();
 	while (itBlock != blocks.end())
 	{
-		if ((*itBlock)->code == MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY )
+		Profile_Block* pBlock = *itBlock;
+		if (pBlock->code == MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY)
 		{
 			PrintHeapShotSummary(pOutputReport,*itBlock);
-		} 
+		}
+		else if (pBlock->code == MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA){
+			PrintHeapShotData(pOutputReport, *itBlock);
+		}
 		++itBlock;
 	}
 	fclose(pOutputReport);

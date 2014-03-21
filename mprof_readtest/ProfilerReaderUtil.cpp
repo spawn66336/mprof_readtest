@@ -153,7 +153,8 @@ Profile_Block* ProfileBlockFactory(unsigned int type)
 		break;
 	case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL: 
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA:
+		pBlock = new Profile_Heapshot_Data_Block;
 		break;
 	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY: 
 		pBlock = new Profile_Heapshot_Summary;
@@ -306,4 +307,101 @@ bool Profile_Mapping::InitFromStream(FILE* stream)
 	ProfilerReaderUtil::ReadUInt64(stream, end_time); 
 
 	return true;
+}
+
+
+
+Profile_Heapshot_Data_Block::Profile_Heapshot_Data_Block()
+{
+
+}
+
+Profile_Heapshot_Data_Block::~Profile_Heapshot_Data_Block()
+{
+
+}
+
+bool Profile_Heapshot_Data_Block::InitFromStream(FILE* stream)
+{
+	if (!Profile_Block::InitFromStream(stream))
+		return false;
+
+	VERIFY_STREAM(stream);
+	ProfilerReaderUtil::ReadUInt64(stream, job_start_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, job_start_time);
+	ProfilerReaderUtil::ReadUInt64(stream, job_end_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, job_end_time);
+	ProfilerReaderUtil::ReadUInt(stream, job_collection);
+
+	ProfilerReaderUtil::ReadUInt64(stream, write_start_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, write_start_time);
+
+	while (1)
+	{
+		unsigned int code = HEAP_CODE_NONE;
+		ProfilerReaderUtil::ReadUInt(stream, code);
+		if (0 == code)
+			break;
+
+		fseek(stream, ftell(stream) - 4, SEEK_SET);
+		Profile_Object_Info obj_info;
+
+		if(!obj_info.InitFromStream(stream))
+		{
+			printf("Ω‚ŒˆObjectInfo“‚Õ‚ ß∞‹£°\n");
+			break;
+		}
+
+		if (obj_info.code == HEAP_CODE_OBJECT)
+		{
+			objs.insert(std::make_pair(obj_info.obj, obj_info));
+		}
+	} 
+
+	ProfilerReaderUtil::ReadUInt64(stream, write_end_counter);
+	ProfilerReaderUtil::ReadUInt64(stream, write_end_time);
+
+}
+
+bool Profile_Heapshot_Data_Block::Profile_Object_Info::InitFromStream(FILE* stream)
+{
+	VERIFY_STREAM(stream);
+
+	ProfilerReaderUtil::ReadUInt(stream, code);
+
+	if (code == HEAP_CODE_OBJECT)
+	{
+		ProfilerReaderUtil::ReadUInt(stream, obj);
+		ProfilerReaderUtil::ReadUInt(stream, class_id);
+		ProfilerReaderUtil::ReadUInt(stream, size);
+		ProfilerReaderUtil::ReadUInt(stream, ref_count);
+
+		for (int i = 0; i < ref_count; i++)
+		{
+			unsigned int objRef = 0;
+			ProfilerReaderUtil::ReadUInt(stream,objRef);
+			refs.push_back(objRef);
+		}
+		return true;
+	}
+	else if (code == HEAP_CODE_FREE_OBJECT_CLASS){
+		ProfilerReaderUtil::ReadUInt(stream, class_id);
+		ProfilerReaderUtil::ReadUInt(stream, size);
+		return true;
+	}
+	return false;
+}
+
+Profile_Heapshot_Data_Block::Profile_Object_Info::Profile_Object_Info()
+:code(0),
+obj(0),
+class_id(0),
+size(0),
+ref_count(0)
+{ 
+}
+
+Profile_Heapshot_Data_Block::Profile_Object_Info::~Profile_Object_Info()
+{
+
 }

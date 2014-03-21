@@ -19,6 +19,13 @@ typedef enum {
 	MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES = 10
 } MonoProfilerFileBlockKind;
 
+typedef enum {
+	HEAP_CODE_NONE = 0,
+	HEAP_CODE_OBJECT = 1,
+	HEAP_CODE_FREE_OBJECT_CLASS = 2,
+	HEAP_CODE_MASK = 3
+} HeapProfilerJobValueCode;
+
 class Profile_Block
 {
 public:
@@ -104,6 +111,47 @@ public:
 	unsigned int	 collection;
 	std::vector<Summary_Item> items;
 	Profile_Mapping* mapping;
+
+};
+
+class Profile_Heapshot_Data_Block : public Profile_Block
+{
+public:
+
+	class Profile_Object_Info
+	{
+	public:
+		Profile_Object_Info();
+		~Profile_Object_Info();
+
+		bool InitFromStream(FILE* stream);
+
+		unsigned int code;
+		unsigned int obj;
+		unsigned int class_id;
+		unsigned int size;
+		unsigned int ref_count;
+		std::vector<unsigned int> refs;
+	};
+
+	Profile_Heapshot_Data_Block();
+	~Profile_Heapshot_Data_Block();
+
+	virtual bool InitFromStream(FILE* stream);
+
+
+	unsigned __int64 job_start_counter;
+	unsigned __int64 job_start_time;
+	unsigned __int64 job_end_counter;
+	unsigned __int64 job_end_time;
+	unsigned int	 job_collection;
+
+	unsigned __int64 write_start_counter;
+	unsigned __int64 write_start_time;
+	unsigned __int64 write_end_counter;
+	unsigned __int64 write_end_time;
+
+	std::map<unsigned int, Profile_Object_Info> objs;
 
 };
 
