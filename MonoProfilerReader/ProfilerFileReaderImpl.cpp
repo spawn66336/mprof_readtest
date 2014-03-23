@@ -1,11 +1,41 @@
-#include "ProfilerReaderUtil.h"
+#include "ProfilerFileReaderImpl.h"
+#include <stdio.h>
+#include "ProfileReaderInterfaceImpl.h"
+
+ProfilerLoggingFileReader::ProfilerLoggingFileReader()
+{
+
+}
+
+ProfilerLoggingFileReader::~ProfilerLoggingFileReader()
+{
+
+}
+
+IHeapShot* ProfilerLoggingFileReader::CreateHeapShotFromFile(const char* filename)
+{
+	IHeapShot* pHeapShot = NULL;
+	FILE* pFile = NULL;
+	fopen_s(&pFile,filename,"rb");
+	if (pFile)
+	{
+		Profile_HeapShot_Data* pHeapShotData = new Profile_HeapShot_Data;
+		pHeapShotData->InitFromStream(pFile);
+		pHeapShot = pHeapShotData->MakeHeapShotData();
+		fclose(pFile);
+
+		delete pHeapShotData;
+		pHeapShotData = NULL; 
+	}
+	return pHeapShot;
+}
+
 
 #define VERIFY_STREAM(s) do{\
 if (!s || feof(s)) return false; \
 }while (0)
 
 
-std::map<unsigned int, Profile_Mapping::Class_Info> g_class_mapping; 
 
 bool ProfilerReaderUtil::ReadUShort(FILE* stream, unsigned short& val)
 {
@@ -47,17 +77,17 @@ bool ProfilerReaderUtil::ReadString(FILE* stream, std::string& val)
 bool ProfilerReaderUtil::ReadBuffer(FILE* stream, void* buf, unsigned int size)
 {
 	VERIFY_STREAM(stream);
-	size_t bytesRead = fread_s(buf, size,1,size, stream);
+	size_t bytesRead = fread_s(buf, size, 1, size, stream);
 	if (bytesRead != size)
 		return false;
 	return true;
 }
 
 
- 
+
 
 Profile_Block* ProfilerReaderUtil::ReadBlock(FILE* stream)
-{ 
+{
 	if (NULL == stream || feof(stream))
 		return NULL;
 
@@ -65,7 +95,7 @@ Profile_Block* ProfilerReaderUtil::ReadBlock(FILE* stream)
 	bool rs = false;
 	rs = ReadUShort(stream, blockType);
 	//回退两个字节
-	fseek(stream,ftell(stream)-2,SEEK_SET); 
+	fseek(stream, ftell(stream) - 2, SEEK_SET);
 	if (!rs) return NULL;
 	printf("%s\n", MonoProfilerFileBlockKindMap(blockType).c_str());
 	Profile_Block* pBlock = ProfileBlockFactory(blockType);
@@ -74,8 +104,8 @@ Profile_Block* ProfilerReaderUtil::ReadBlock(FILE* stream)
 		SkipBlock(stream);
 		return NULL;
 	}
-	
-	pBlock->InitFromStream(stream); 
+
+	pBlock->InitFromStream(stream);
 
 	return pBlock;
 }
@@ -92,43 +122,43 @@ void ProfilerReaderUtil::SkipBlock(FILE* stream)
 	fseek(stream, blockSize, SEEK_CUR);
 }
 
- 
+
 std::string MonoProfilerFileBlockKindMap(unsigned int code)
 {
 	switch (code)
 	{
-		case MONO_PROFILER_FILE_BLOCK_KIND_INTRO:
-			return "KIND_INTRO";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_END:
-			return "KIND_END";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_MAPPING:
-			return "KIND_MAPPING";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_LOADED:
-			return "KIND_LOADED";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_UNLOADED:
-			return "KIND_UNLOADED";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_EVENTS:
-			return "KIND_EVENTS";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL:
-			return "KIND_STATISTICAL";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA:
-			return "KIND_HEAP_DATA";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY:
-			return "KIND_HEAP_SUMMARY";
-			break;
-		case MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES:
-			return "KIND_DIRECTIVES";
-			break;
-		default:
-			break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_INTRO:
+		return "KIND_INTRO";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_END:
+		return "KIND_END";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_MAPPING:
+		return "KIND_MAPPING";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_LOADED:
+		return "KIND_LOADED";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_UNLOADED:
+		return "KIND_UNLOADED";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_EVENTS:
+		return "KIND_EVENTS";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL:
+		return "KIND_STATISTICAL";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA:
+		return "KIND_HEAP_DATA";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY:
+		return "KIND_HEAP_SUMMARY";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES:
+		return "KIND_DIRECTIVES";
+		break;
+	default:
+		break;
 	}
 	return "KIND_UNKNOWN";
 }
@@ -138,28 +168,28 @@ Profile_Block* ProfileBlockFactory(unsigned int type)
 	Profile_Block* pBlock = NULL;
 	switch (type)
 	{
-	case MONO_PROFILER_FILE_BLOCK_KIND_INTRO: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_INTRO:
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_END: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_END:
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_MAPPING: 
-		pBlock = new Profile_Mapping;
+	case MONO_PROFILER_FILE_BLOCK_KIND_MAPPING:
+		pBlock = new Profile_Mapping_Block;
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_LOADED: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_LOADED:
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_UNLOADED: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_UNLOADED:
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_EVENTS: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_EVENTS:
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL:
 		break;
 	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA:
 		pBlock = new Profile_Heapshot_Data_Block;
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY:
 		pBlock = new Profile_Heapshot_Summary;
 		break;
-	case MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES: 
+	case MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES:
 		break;
 	default:
 		break;
@@ -172,13 +202,13 @@ Profile_Block* ProfileBlockFactory(unsigned int type)
 	return pBlock;
 }
 
-Profile_Heapshot_Summary::Profile_Heapshot_Summary():
+Profile_Heapshot_Summary::Profile_Heapshot_Summary() :
 Profile_Block(),
 start_counter(0),
 start_time(0),
 collection(0),
 mapping(NULL)
-{ 
+{
 }
 
 bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
@@ -199,7 +229,7 @@ bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
 			break;
 		Summary_Item item;
 		item.class_id = class_id;
-		ProfilerReaderUtil::ReadUInt(stream,item.reachable_insts);
+		ProfilerReaderUtil::ReadUInt(stream, item.reachable_insts);
 		ProfilerReaderUtil::ReadUInt(stream, item.reachable_bytes);
 		ProfilerReaderUtil::ReadUInt(stream, item.unreachable_insts);
 		ProfilerReaderUtil::ReadUInt(stream, item.unreachable_bytes);
@@ -207,7 +237,7 @@ bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
 	}
 
 	ProfilerReaderUtil::ReadUInt64(stream, end_counter);
-	ProfilerReaderUtil::ReadUInt64(stream, end_time); 
+	ProfilerReaderUtil::ReadUInt64(stream, end_time);
 
 	return true;
 
@@ -218,9 +248,9 @@ bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
 bool Profile_Block::InitFromStream(FILE* stream)
 {
 	VERIFY_STREAM(stream);
-	ProfilerReaderUtil::ReadUShort(stream,code);
-	ProfilerReaderUtil::ReadUInt(stream,size);
-	ProfilerReaderUtil::ReadUInt(stream,counter_delta);
+	ProfilerReaderUtil::ReadUShort(stream, code);
+	ProfilerReaderUtil::ReadUInt(stream, size);
+	ProfilerReaderUtil::ReadUInt(stream, counter_delta);
 	return true;
 }
 
@@ -250,21 +280,21 @@ Profile_Raw_Block::~Profile_Raw_Block()
 	}
 }
 
-Profile_Mapping::Profile_Mapping() :
+Profile_Mapping_Block::Profile_Mapping_Block() :
 Profile_Block(),
 start_counter(0),
 start_time(0),
 end_counter(0),
 end_time(0),
 thread_id(0)
-{ 
+{
 }
 
-Profile_Mapping::~Profile_Mapping()
-{ 
+Profile_Mapping_Block::~Profile_Mapping_Block()
+{
 }
 
-bool Profile_Mapping::InitFromStream(FILE* stream)
+bool Profile_Mapping_Block::InitFromStream(FILE* stream)
 {
 	if (!Profile_Block::InitFromStream(stream))
 		return false;
@@ -280,14 +310,12 @@ bool Profile_Mapping::InitFromStream(FILE* stream)
 		ProfilerReaderUtil::ReadUInt(stream, class_id);
 		if (!class_id)
 			break;
-		Class_Info info; 
+		Class_Info info;
 		info.class_id = class_id;
 		ProfilerReaderUtil::ReadUInt(stream, info.assembly_id);
-		ProfilerReaderUtil::ReadString(stream, info.class_name); 
+		ProfilerReaderUtil::ReadString(stream, info.class_name);
 		class_map.insert(std::make_pair(info.class_id, info));
-
-		//注册全局类信息
-		g_class_mapping.insert(std::make_pair(info.class_id, info));  
+		 
 	}
 
 	while (1)
@@ -302,9 +330,9 @@ bool Profile_Mapping::InitFromStream(FILE* stream)
 		ProfilerReaderUtil::ReadUInt(stream, info.wrapper_type);
 		ProfilerReaderUtil::ReadString(stream, info.method_name);
 		method_map.insert(std::make_pair(info.method_id, info));
-	} 
+	}
 	ProfilerReaderUtil::ReadUInt64(stream, end_counter);
-	ProfilerReaderUtil::ReadUInt64(stream, end_time); 
+	ProfilerReaderUtil::ReadUInt64(stream, end_time);
 
 	return true;
 }
@@ -346,7 +374,7 @@ bool Profile_Heapshot_Data_Block::InitFromStream(FILE* stream)
 		fseek(stream, ftell(stream) - 4, SEEK_SET);
 		Profile_Object_Info obj_info;
 
-		if(!obj_info.InitFromStream(stream))
+		if (!obj_info.InitFromStream(stream))
 		{
 			printf("解析ObjectInfo意外失败！\n");
 			break;
@@ -356,11 +384,12 @@ bool Profile_Heapshot_Data_Block::InitFromStream(FILE* stream)
 		{
 			objs.insert(std::make_pair(obj_info.obj, obj_info));
 		}
-	} 
+	}
 
 	ProfilerReaderUtil::ReadUInt64(stream, write_end_counter);
 	ProfilerReaderUtil::ReadUInt64(stream, write_end_time);
 
+	return true;
 }
 
 bool Profile_Heapshot_Data_Block::Profile_Object_Info::InitFromStream(FILE* stream)
@@ -376,10 +405,10 @@ bool Profile_Heapshot_Data_Block::Profile_Object_Info::InitFromStream(FILE* stre
 		ProfilerReaderUtil::ReadUInt(stream, size);
 		ProfilerReaderUtil::ReadUInt(stream, ref_count);
 
-		for (int i = 0; i < ref_count; i++)
+		for (int i = 0; i < (int)(ref_count); i++)
 		{
 			unsigned int objRef = 0;
-			ProfilerReaderUtil::ReadUInt(stream,objRef);
+			ProfilerReaderUtil::ReadUInt(stream, objRef);
 			refs.push_back(objRef);
 		}
 		return true;
@@ -398,10 +427,126 @@ obj(0),
 class_id(0),
 size(0),
 ref_count(0)
-{ 
+{
 }
 
 Profile_Heapshot_Data_Block::Profile_Object_Info::~Profile_Object_Info()
 {
 
+}
+
+Profile_HeapShot_Data::Profile_HeapShot_Data()
+{
+
+}
+
+Profile_HeapShot_Data::~Profile_HeapShot_Data()
+{
+	Clear();
+}
+
+void Profile_HeapShot_Data::InitFromStream(FILE* stream)
+{
+	Clear();
+
+	Profile_Block* pBlock = NULL;
+	while (pBlock = ProfilerReaderUtil::ReadBlock(stream))
+	{
+		m_blocks.push_back(pBlock);
+	}
+
+	//将所有映射文件中的类信息注册至类注册表
+	auto itBlock = m_blocks.begin();
+	while (itBlock != m_blocks.end())
+	{
+		if (MONO_PROFILER_FILE_BLOCK_KIND_MAPPING == (*itBlock)->code)
+		{
+			Profile_Mapping_Block* pMapBlock = (Profile_Mapping_Block*)(*itBlock);
+			auto itClass = pMapBlock->class_map.begin();
+			while (itClass != pMapBlock->class_map.end())
+			{
+				m_classMap.insert(std::make_pair(itClass->first, itClass->second));
+				++itClass;
+			}
+		}
+		++itBlock;
+	}
+}
+
+IHeapShot* Profile_HeapShot_Data::MakeHeapShotData()
+{
+	HeapShotImpl* pHeapShot = new HeapShotImpl;
+	if (pHeapShot)
+	{
+		auto itClass = m_classMap.begin();
+		while (itClass != m_classMap.end())
+		{
+			ClassInfoImpl* pClass = new ClassInfoImpl;
+			pClass->m_id = itClass->second.class_id;
+			pClass->m_name = itClass->second.class_name;
+
+			auto insertRs =
+				pHeapShot->m_classMap.insert(std::make_pair(pClass->m_id, pClass));
+			if (!insertRs.second)
+			{
+				delete pClass;
+				pClass = NULL;
+			}
+
+			++itClass;
+		}
+
+		auto itBlock = m_blocks.begin();
+		while (itBlock != m_blocks.end())
+		{
+			if (MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA == (*itBlock)->code)
+			{
+				Profile_Heapshot_Data_Block* pHeapDataBlock = (Profile_Heapshot_Data_Block*)(*itBlock);
+				HeapDataImpl* pHeapData = new HeapDataImpl;
+				if (pHeapData)
+				{
+					auto itObj = pHeapDataBlock->objs.begin();
+					while (itObj != pHeapDataBlock->objs.end())
+					{
+						if (HEAP_CODE_OBJECT == itObj->second.code)
+						{
+							ObjectInfoImpl* pObj = new ObjectInfoImpl;
+							pObj->m_id = itObj->second.obj;
+							pObj->m_classID = itObj->second.class_id;
+							pObj->m_size = itObj->second.size;
+							pObj->m_isReachable = true;
+							pObj->m_refObjs = itObj->second.refs;
+
+							pHeapData->m_objs.insert(std::make_pair(pObj->m_id, pObj));
+						}
+
+						++itObj;
+					}//while (itObj != pHeapDataBlock->objs.end())  
+					pHeapShot->m_heapDataList.push_back(pHeapData);
+				}//if (pHeapData)
+			}//if (MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA == (*itBlock)->code)
+			++itBlock;
+		}//while (itBlock != m_blocks.end()) 
+		return pHeapShot;
+	}
+	return NULL;
+}
+
+void Profile_HeapShot_Data::Clear()
+{
+	m_classMap.clear();
+	auto itBlock = m_blocks.begin();
+	while (itBlock != m_blocks.end())
+	{
+		delete *itBlock;
+		*itBlock = NULL;
+		++itBlock;
+	}
+	m_blocks.clear();
+}
+
+
+IProfilerFileReader* IProfilerFileReader::CreateInstance(const ProfilerFileReaderType type)
+{
+	return new ProfilerLoggingFileReader;
 }

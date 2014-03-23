@@ -1,10 +1,14 @@
 #pragma once
+#include "ProfilerFileReaderInterface.h"
+
+
 
 #include <stdio.h>
 #include <string>
 #include <vector>
 #include <map>
 #include <stack>
+#include "ProfileReaderInterface.h"
 
 typedef enum {
 	MONO_PROFILER_FILE_BLOCK_KIND_INTRO = 1,
@@ -30,8 +34,8 @@ class Profile_Block
 {
 public:
 	Profile_Block() :
-		code(0), 
-		size(0), 
+		code(0),
+		size(0),
 		counter_delta(0)
 	{
 
@@ -46,18 +50,18 @@ public:
 class Profile_Raw_Block : public Profile_Block
 {
 public:
-	Profile_Raw_Block():
+	Profile_Raw_Block() :
 		Profile_Block(), pBuf(0){}
 	~Profile_Raw_Block();
 
 	virtual bool InitFromStream(FILE* stream);
-	
+
 	unsigned char* pBuf;
 };
 
 
 
-class Profile_Mapping : public Profile_Block
+class Profile_Mapping_Block : public Profile_Block
 {
 public:
 	typedef struct{
@@ -73,18 +77,18 @@ public:
 		std::string  method_name;
 	}Method_Info;
 
-	Profile_Mapping();
-	~Profile_Mapping();
+	Profile_Mapping_Block();
+	~Profile_Mapping_Block();
 
 	virtual bool InitFromStream(FILE* stream);
-	 
+
 	unsigned __int64 start_counter;
 	unsigned __int64 start_time;
 	unsigned __int64 end_counter;
-	unsigned __int64 end_time; 
+	unsigned __int64 end_time;
 	unsigned __int64 thread_id;
 	std::map<unsigned int, Class_Info> class_map;
-	std::map<unsigned int, Method_Info> method_map; 
+	std::map<unsigned int, Method_Info> method_map;
 };
 
 class Profile_Heapshot_Summary : public Profile_Block
@@ -110,7 +114,7 @@ public:
 	unsigned __int64 end_time;
 	unsigned int	 collection;
 	std::vector<Summary_Item> items;
-	Profile_Mapping* mapping;
+	Profile_Mapping_Block* mapping;
 
 };
 
@@ -157,12 +161,10 @@ public:
 
 
 Profile_Block* ProfileBlockFactory(unsigned int type);
- 
-extern std::map<unsigned int, Profile_Mapping::Class_Info> g_class_mapping; 
 
 class ProfilerReaderUtil
 {
-public: 
+public:
 
 	static bool ReadUShort(FILE* stream, unsigned short& val);
 	static bool ReadUInt(FILE* stream, unsigned int& val);
@@ -173,7 +175,33 @@ public:
 
 private:
 	static void SkipBlock(FILE* stream);
-	
+
+};
+ 
+std::string MonoProfilerFileBlockKindMap(unsigned int code);
+
+class Profile_HeapShot_Data
+{
+public:
+	Profile_HeapShot_Data();
+	~Profile_HeapShot_Data();
+
+	void InitFromStream(FILE* stream);
+	IHeapShot* MakeHeapShotData();
+
+protected:
+	void Clear();
+protected:
+	std::map<unsigned int, Profile_Mapping_Block::Class_Info> m_classMap;
+	std::vector<Profile_Block*> m_blocks;
 };
 
-std::string MonoProfilerFileBlockKindMap(unsigned int code);
+
+class ProfilerLoggingFileReader : public IProfilerFileReader
+{
+public:
+	ProfilerLoggingFileReader();
+	virtual ~ProfilerLoggingFileReader();
+
+	virtual IHeapShot* CreateHeapShotFromFile(const char* filename);
+};
