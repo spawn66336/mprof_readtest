@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonoProfilerReader", "MonoP
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonoProfilerReaderBridge", "MonoProfilerReaderBridge\MonoProfilerReaderBridge.vcxproj", "{D8F01AD1-3A99-4542-AA84-F822A1785DE8}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HeapShotControl", "HeapShotControl\HeapShotControl.vcxproj", "{A3C8055A-CC66-42D6-9456-EF39648EF4A4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -27,6 +29,10 @@ Global
 		{D8F01AD1-3A99-4542-AA84-F822A1785DE8}.Debug|Win32.Build.0 = Debug|Win32
 		{D8F01AD1-3A99-4542-AA84-F822A1785DE8}.Release|Win32.ActiveCfg = Release|Win32
 		{D8F01AD1-3A99-4542-AA84-F822A1785DE8}.Release|Win32.Build.0 = Release|Win32
+		{A3C8055A-CC66-42D6-9456-EF39648EF4A4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A3C8055A-CC66-42D6-9456-EF39648EF4A4}.Debug|Win32.Build.0 = Debug|Win32
+		{A3C8055A-CC66-42D6-9456-EF39648EF4A4}.Release|Win32.ActiveCfg = Release|Win32
+		{A3C8055A-CC66-42D6-9456-EF39648EF4A4}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

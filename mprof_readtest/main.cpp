@@ -45,7 +45,7 @@ void main()
 	IProfilerHeapShotManager* pHeapShotMgr =  CreateProfilerHeapShotManager();
 
 	IHeapShot* pHeapShot = 
-	pHeapShotMgr->CreateHeapShotFromFile("MonoProfiler_Test.mprof");
+	pHeapShotMgr->CreateHeapShotFromFile("HelloWorld.mprof");
 	OutputHeapShotToFile("HeapShotReport.txt", pHeapShot);
 	DestroyProfilerHeapShotManager(pHeapShotMgr);
 	pHeapShotMgr = NULL;
