@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream> 
 #include <vector>
+#include <map>
 #include "ProfileReaderInterface.h"
 
 using namespace std;
@@ -13,6 +14,7 @@ void OutputHeapShotToFile(const std::string& filename, IHeapShot* pHeapShot)
 	fopen_s(&pOutFile, filename.c_str(), "wb");
 	if (pOutFile)
 	{
+		std::map<unsigned int,IClassInfo*> classMapping;
 		for (int i = 0; i < pHeapShot->GetHeapDataCount(); i++)
 		{
 			IHeapData* pHeapData = pHeapShot->GetHeapDataByIndex(i);
@@ -25,6 +27,12 @@ void OutputHeapShotToFile(const std::string& filename, IHeapShot* pHeapShot)
 			{
 				IClassInfo* pClass =
 				pHeapShot->GetClassInfoByID(pObj->GetClassID());
+
+				auto itFindClass = classMapping.find(pObj->GetClassID());
+				if (itFindClass == classMapping.end())
+				{
+					classMapping.insert(std::make_pair(pObj->GetClassID(), pClass));
+				}
 				
 				fprintf(pOutFile, "%-50s\t\t[%p] refs=%d, size=%d\n" ,pClass->GetName(), pObj->GetID() ,pObj->GetRefObjCount(), pObj->GetSize());
 
@@ -36,6 +44,20 @@ void OutputHeapShotToFile(const std::string& filename, IHeapShot* pHeapShot)
 			} 
 			fprintf(pOutFile, "****************************************************\n");
 		}
+
+
+		fprintf(pOutFile, "***********************ClassMapping**********************\n");
+
+		auto itClass = classMapping.begin();
+		while (itClass != classMapping.end())
+		{
+			IClassInfo* pClass = itClass->second;
+			fprintf(pOutFile,"[%d]\t\t%s\n", pClass->GetID(), pClass->GetName());
+			++itClass;
+		}
+		 
+		fprintf(pOutFile, "*********************************************************\n");
+
 		fclose(pOutFile);
 	}
 }
@@ -45,7 +67,7 @@ void main()
 	IProfilerHeapShotManager* pHeapShotMgr =  CreateProfilerHeapShotManager();
 
 	IHeapShot* pHeapShot = 
-	pHeapShotMgr->CreateHeapShotFromFile("HelloWorld.mprof");
+	pHeapShotMgr->CreateHeapShotFromFile("profiler-log.mprof");
 	OutputHeapShotToFile("HeapShotReport.txt", pHeapShot);
 	DestroyProfilerHeapShotManager(pHeapShotMgr);
 	pHeapShotMgr = NULL;
