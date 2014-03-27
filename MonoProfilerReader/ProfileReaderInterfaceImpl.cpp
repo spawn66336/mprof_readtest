@@ -8,7 +8,6 @@ m_id(0)
 
 ClassInfoImpl::~ClassInfoImpl()
 {
-
 }
 
 unsigned int ClassInfoImpl::GetID() const
@@ -204,10 +203,14 @@ ProfilerHeapShotManager::~ProfilerHeapShotManager()
 IHeapShot* ProfilerHeapShotManager::CreateHeapShotFromFile(const char* filename)
 {
 	IHeapShot* pNewHeapShot = m_pFileReader->CreateHeapShotFromFile(filename);
+	
 	if (pNewHeapShot)
 	{
 		m_heapShotList.push_back(pNewHeapShot);
 		return pNewHeapShot;
+	}
+	else{
+		printf("无法打开文件：%s\n", filename);
 	}
 	return NULL;
 }

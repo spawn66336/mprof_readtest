@@ -143,7 +143,10 @@ MonoProfilerReaderBridge::ProfilerHeapShotManager::~ProfilerHeapShotManager()
 
 MonoProfilerReaderBridge::HeapShot^ MonoProfilerReaderBridge::ProfilerHeapShotManager::CreateHeapShotFromFile(System::String^ filename)
 {
-	IHeapShot* pHeapShot =  m_pMgr->CreateHeapShotFromFile(StringItem(filename).getBuf());
+
+	UMConverter con_filename(StringItem(filename).getBuf());
+
+	IHeapShot* pHeapShot = m_pMgr->CreateHeapShotFromFile(con_filename.GetMBCS());
 	if (pHeapShot)
 	{
 		unsigned int key = *((unsigned int*)(&pHeapShot));

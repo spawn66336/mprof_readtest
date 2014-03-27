@@ -1,10 +1,8 @@
 #pragma once
-
-#ifdef _USRDLL
+ 
 #define MPR_API  __declspec(dllexport)
-#else
-#define MPR_API  __declspec(dllimport)
-#endif
+ 
+
 class IClassInfo
 {
 public:
@@ -67,7 +65,8 @@ public:
 	virtual IHeapShot* GetHeapShotByIndex(const unsigned int i) const = 0;
 };
  
+ 
+MPR_API  IProfilerHeapShotManager*  CreateProfilerHeapShotManager();
+MPR_API void  DestroyProfilerHeapShotManager(IProfilerHeapShotManager* pMgr);
 
-MPR_API IProfilerHeapShotManager* CreateProfilerHeapShotManager();
-MPR_API void DestroyProfilerHeapShotManager(IProfilerHeapShotManager* pMgr);
-
+ 
