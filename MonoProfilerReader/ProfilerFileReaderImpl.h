@@ -35,6 +35,10 @@ STREAM_HANDLE OpenReadStream(const char* filename);
 BOOL ReadStream(STREAM_HANDLE stream, void* pbuf, DWORD bytes2Read, DWORD& bytesRead);
 BOOL IsEOF(STREAM_HANDLE stream);
 DWORD StreamSeek(STREAM_HANDLE stream, int offset, DWORD flag);
+//返回流的当前位置
+DWORD StreamTell(STREAM_HANDLE stream);
+//返回流的总大小
+DWORD StreamTotalSize(STREAM_HANDLE stream);
 BOOL CloseStream(STREAM_HANDLE stream);
 
 class Profile_Block

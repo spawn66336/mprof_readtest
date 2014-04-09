@@ -105,11 +105,13 @@ Profile_Block* ProfilerReaderUtil::ReadBlock(STREAM_HANDLE stream)
 		return NULL;
 
 	unsigned short blockType = 0; 
-	ReadUShort(stream, blockType); 
-	if (blockType < MONO_PROFILER_FILE_BLOCK_KIND_INTRO ||
-		blockType >= MONO_PROFILER_FILE_BLOCK_KIND_MAX)
+	ReadUShort(stream, blockType);  
+
+	//若块类型不在范围内，则直接返回空
+	if (blockType >= MONO_PROFILER_FILE_BLOCK_KIND_MAX)
 		return NULL;
 	
+
 	//回退两个字节 
 	StreamSeek(stream, -2, FILE_CURRENT); 
 	printf("%s\n", MonoProfilerFileBlockKindMap(blockType).c_str());
@@ -120,7 +122,12 @@ Profile_Block* ProfilerReaderUtil::ReadBlock(STREAM_HANDLE stream)
 		return NULL;
 	}
 
-	pBlock->InitFromStream(stream);
+	//从文件中创建失败则删除此块
+	if (!pBlock->InitFromStream(stream))
+	{
+		delete pBlock;
+		pBlock = NULL;
+	}
 
 	return pBlock;
 }
@@ -246,9 +253,21 @@ DWORD StreamSeek(STREAM_HANDLE stream, int offset, DWORD flag)
 	return SetFilePointer(stream, offset, NULL, flag);
 }
 
+
+DWORD StreamTell(STREAM_HANDLE stream)
+{
+	return SetFilePointer(stream, 0, NULL, FILE_CURRENT);
+}
+
+
 BOOL CloseStream(STREAM_HANDLE stream)
 {
 	return CloseHandle(stream);
+}
+
+DWORD StreamTotalSize(STREAM_HANDLE stream)
+{
+	return GetFileSize(stream, NULL);
 }
 
 Profile_Heapshot_Summary::Profile_Heapshot_Summary() :
@@ -300,6 +319,18 @@ bool Profile_Block::InitFromStream(STREAM_HANDLE stream)
 	ProfilerReaderUtil::ReadUShort(stream, code);
 	ProfilerReaderUtil::ReadUInt(stream, size);
 	ProfilerReaderUtil::ReadUInt(stream, counter_delta);
+	
+	//计算剩余空间
+	DWORD surplusSize = StreamTotalSize(stream) - StreamTell(stream);
+
+	//若当前块的后续内容大小，小于文件
+	//剩余待读取区域大小则说明文件残缺
+	//返回失败
+	if (size > surplusSize)
+	{
+		return false;
+	}
+
 	return true;
 }
 
