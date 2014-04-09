@@ -1,14 +1,12 @@
 #pragma once
 #include "ProfilerFileReaderInterface.h"
-
-
-
 #include <stdio.h>
 #include <string>
 #include <vector>
 #include <map>
 #include <stack>
 #include "ProfileReaderInterface.h"
+#include <windows.h>
 
 typedef enum {
 	MONO_PROFILER_FILE_BLOCK_KIND_INTRO = 1,
@@ -20,7 +18,8 @@ typedef enum {
 	MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL = 7,
 	MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA = 8,
 	MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY = 9,
-	MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES = 10
+	MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES = 10,
+	MONO_PROFILER_FILE_BLOCK_KIND_MAX
 } MonoProfilerFileBlockKind;
 
 typedef enum {
@@ -29,6 +28,14 @@ typedef enum {
 	HEAP_CODE_FREE_OBJECT_CLASS = 2,
 	HEAP_CODE_MASK = 3
 } HeapProfilerJobValueCode;
+
+typedef  HANDLE STREAM_HANDLE;
+ 
+STREAM_HANDLE OpenReadStream(const char* filename);
+BOOL ReadStream(STREAM_HANDLE stream, void* pbuf, DWORD bytes2Read, DWORD& bytesRead);
+BOOL IsEOF(STREAM_HANDLE stream);
+DWORD StreamSeek(STREAM_HANDLE stream, int offset, DWORD flag);
+BOOL CloseStream(STREAM_HANDLE stream);
 
 class Profile_Block
 {
@@ -44,7 +51,7 @@ public:
 	unsigned int size;
 	unsigned int counter_delta;
 
-	virtual bool InitFromStream(FILE* stream);
+	virtual bool InitFromStream(STREAM_HANDLE stream);
 };
 
 class Profile_Raw_Block : public Profile_Block
@@ -54,7 +61,7 @@ public:
 		Profile_Block(), pBuf(0){}
 	~Profile_Raw_Block();
 
-	virtual bool InitFromStream(FILE* stream);
+	virtual bool InitFromStream(STREAM_HANDLE stream);
 
 	unsigned char* pBuf;
 };
@@ -80,7 +87,7 @@ public:
 	Profile_Mapping_Block();
 	~Profile_Mapping_Block();
 
-	virtual bool InitFromStream(FILE* stream);
+	virtual bool InitFromStream(STREAM_HANDLE stream);
 
 	unsigned __int64 start_counter;
 	unsigned __int64 start_time;
@@ -106,7 +113,7 @@ public:
 	Profile_Heapshot_Summary();
 	~Profile_Heapshot_Summary(){}
 
-	virtual bool InitFromStream(FILE* stream);
+	virtual bool InitFromStream(STREAM_HANDLE stream);
 
 	unsigned __int64 start_counter;
 	unsigned __int64 start_time;
@@ -128,7 +135,7 @@ public:
 		Profile_Object_Info();
 		~Profile_Object_Info();
 
-		bool InitFromStream(FILE* stream);
+		bool InitFromStream(STREAM_HANDLE stream);
 
 		unsigned int code;
 		unsigned int obj;
@@ -141,7 +148,7 @@ public:
 	Profile_Heapshot_Data_Block();
 	~Profile_Heapshot_Data_Block();
 
-	virtual bool InitFromStream(FILE* stream);
+	virtual bool InitFromStream(STREAM_HANDLE stream);
 
 
 	unsigned __int64 job_start_counter;
@@ -166,15 +173,15 @@ class ProfilerReaderUtil
 {
 public:
 
-	static bool ReadUShort(FILE* stream, unsigned short& val);
-	static bool ReadUInt(FILE* stream, unsigned int& val);
-	static bool ReadUInt64(FILE* stream, unsigned __int64& val);
-	static bool ReadString(FILE* stream, std::string& val);
-	static bool ReadBuffer(FILE* stream, void* buf, unsigned int size);
-	static Profile_Block* ReadBlock(FILE* stream);
+	static bool ReadUShort(STREAM_HANDLE stream, unsigned short& val);
+	static bool ReadUInt(STREAM_HANDLE stream, unsigned int& val);
+	static bool ReadUInt64(STREAM_HANDLE stream, unsigned __int64& val);
+	static bool ReadString(STREAM_HANDLE stream, std::string& val);
+	static bool ReadBuffer(STREAM_HANDLE stream, void* buf, unsigned int size);
+	static Profile_Block* ReadBlock(STREAM_HANDLE stream);
 
 private:
-	static void SkipBlock(FILE* stream);
+	static void SkipBlock(STREAM_HANDLE stream);
 
 };
  
@@ -186,7 +193,7 @@ public:
 	Profile_HeapShot_Data();
 	~Profile_HeapShot_Data();
 
-	void InitFromStream(FILE* stream);
+	void InitFromStream(STREAM_HANDLE stream);
 	IHeapShot* MakeHeapShotData();
 
 protected:

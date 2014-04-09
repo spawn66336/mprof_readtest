@@ -1,6 +1,7 @@
 #include "ProfilerFileReaderImpl.h"
 #include <stdio.h>
 #include "ProfileReaderInterfaceImpl.h"
+#include <windows.h>
 
 ProfilerLoggingFileReader::ProfilerLoggingFileReader()
 {
@@ -15,14 +16,14 @@ ProfilerLoggingFileReader::~ProfilerLoggingFileReader()
 IHeapShot* ProfilerLoggingFileReader::CreateHeapShotFromFile(const char* filename)
 {
 	IHeapShot* pHeapShot = NULL;
-	FILE* pFile = NULL;
-	fopen_s(&pFile,filename,"rb");
-	if (pFile)
+	STREAM_HANDLE hFile = 0; 
+	hFile = OpenReadStream(filename);
+	if (hFile != INVALID_HANDLE_VALUE)
 	{
 		Profile_HeapShot_Data* pHeapShotData = new Profile_HeapShot_Data;
-		pHeapShotData->InitFromStream(pFile);
+		pHeapShotData->InitFromStream(hFile);
 		pHeapShot = pHeapShotData->MakeHeapShotData();
-		fclose(pFile);
+		CloseStream(hFile);
 
 		delete pHeapShotData;
 		pHeapShotData = NULL; 
@@ -32,53 +33,65 @@ IHeapShot* ProfilerLoggingFileReader::CreateHeapShotFromFile(const char* filenam
 
 
 #define VERIFY_STREAM(s) do{\
-if (!s || feof(s)) return false; \
+if ( !s || s == INVALID_HANDLE_VALUE || IsEOF(s)) return false;\
 }while (0)
 
 
-
-bool ProfilerReaderUtil::ReadUShort(FILE* stream, unsigned short& val)
+bool ProfilerReaderUtil::ReadUShort(STREAM_HANDLE stream, unsigned short& val)
 {
 	VERIFY_STREAM(stream);
-	fread_s(&val, sizeof(val), sizeof(val), 1, stream);
+	DWORD bytes = 0;
+	ReadStream(stream, &val, sizeof(val),bytes); 
+	if (bytes != sizeof(val))
+		return false;
 	return true;
 }
 
-bool ProfilerReaderUtil::ReadUInt(FILE* stream, unsigned int& val)
+bool ProfilerReaderUtil::ReadUInt(STREAM_HANDLE stream, unsigned int& val)
 {
 	VERIFY_STREAM(stream);
-	fread_s(&val, sizeof(val), sizeof(val), 1, stream);
+	DWORD bytes = 0;
+	ReadStream(stream, &val, sizeof(val), bytes);
+	if (bytes != sizeof(val))
+		return false;
 	return true;
 }
 
-bool ProfilerReaderUtil::ReadUInt64(FILE* stream, unsigned __int64& val)
+bool ProfilerReaderUtil::ReadUInt64(STREAM_HANDLE stream, unsigned __int64& val)
 {
 	VERIFY_STREAM(stream);
-	fread_s(&val, sizeof(val), sizeof(val), 1, stream);
+	DWORD bytes = 0;
+	ReadStream(stream, &val, sizeof(val), bytes);
+	if (bytes != sizeof(val))
+		return false;
 	return true;
 }
 
-bool ProfilerReaderUtil::ReadString(FILE* stream, std::string& val)
+bool ProfilerReaderUtil::ReadString(STREAM_HANDLE stream, std::string& val)
 {
 	VERIFY_STREAM(stream);
 	val.clear();
 	char c = 0;
-	while (!feof(stream))
+	DWORD bytes = 0;
+	while (!IsEOF(stream))
 	{
-		fread(&c, 1, 1, stream);
+		ReadStream(stream, &c, 1, bytes);
 		if (0 == c)
+		{
 			break;
+		}
 		val.push_back(c);
-	}
+	} 
 	return true;
 }
 
 
-bool ProfilerReaderUtil::ReadBuffer(FILE* stream, void* buf, unsigned int size)
+bool ProfilerReaderUtil::ReadBuffer(STREAM_HANDLE stream, void* buf, unsigned int size)
 {
 	VERIFY_STREAM(stream);
-	size_t bytesRead = fread_s(buf, size, 1, size, stream);
-	if (bytesRead != size)
+	DWORD bytes = 0;
+	ReadStream(stream, buf, size, bytes);
+	if (bytes != size)
 		return false;
 	return true;
 }
@@ -86,17 +99,19 @@ bool ProfilerReaderUtil::ReadBuffer(FILE* stream, void* buf, unsigned int size)
 
 
 
-Profile_Block* ProfilerReaderUtil::ReadBlock(FILE* stream)
+Profile_Block* ProfilerReaderUtil::ReadBlock(STREAM_HANDLE stream)
 {
-	if (NULL == stream || feof(stream))
+	if (NULL == stream || INVALID_HANDLE_VALUE == stream || IsEOF(stream))
 		return NULL;
 
-	unsigned short blockType = 0;
-	bool rs = false;
-	rs = ReadUShort(stream, blockType);
-	//回退两个字节
-	fseek(stream, ftell(stream) - 2, SEEK_SET);
-	if (!rs) return NULL;
+	unsigned short blockType = 0; 
+	ReadUShort(stream, blockType); 
+	if (blockType < MONO_PROFILER_FILE_BLOCK_KIND_INTRO ||
+		blockType >= MONO_PROFILER_FILE_BLOCK_KIND_MAX)
+		return NULL;
+	
+	//回退两个字节 
+	StreamSeek(stream, -2, FILE_CURRENT); 
 	printf("%s\n", MonoProfilerFileBlockKindMap(blockType).c_str());
 	Profile_Block* pBlock = ProfileBlockFactory(blockType);
 	if (!pBlock)
@@ -110,16 +125,16 @@ Profile_Block* ProfilerReaderUtil::ReadBlock(FILE* stream)
 	return pBlock;
 }
 
-void ProfilerReaderUtil::SkipBlock(FILE* stream)
+void ProfilerReaderUtil::SkipBlock(STREAM_HANDLE stream)
 {
 	unsigned short blockType = 0;
 	unsigned int   blockSize = 0;
-	unsigned int   blockCounterDelta = 0;
+	unsigned int   blockCounterDelta = 0; 
 
 	ReadUShort(stream, blockType);
 	ReadUInt(stream, blockSize);
 	ReadUInt(stream, blockCounterDelta);
-	fseek(stream, blockSize, SEEK_CUR);
+	StreamSeek(stream, blockSize, FILE_CURRENT);
 }
 
 
@@ -202,6 +217,40 @@ Profile_Block* ProfileBlockFactory(unsigned int type)
 	return pBlock;
 }
 
+STREAM_HANDLE OpenReadStream(const char* filename)
+{
+	return CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+}
+
+BOOL ReadStream(STREAM_HANDLE stream, void* pbuf, DWORD bytes2Read, DWORD& bytesRead)
+{
+	return ReadFile(stream, pbuf, bytes2Read, &bytesRead, NULL);
+}
+
+BOOL IsEOF(STREAM_HANDLE stream)
+{
+	char b = 0;
+	DWORD bytesRead = 0;
+	BOOL rs = ReadFile(stream,&b,1,&bytesRead , NULL);
+	if (rs && bytesRead == 0)
+	{//EOF
+		return TRUE;
+	}
+	StreamSeek(stream, -1, FILE_CURRENT);
+	return FALSE;
+}
+
+DWORD StreamSeek(STREAM_HANDLE stream, int offset, DWORD flag)
+{
+	return SetFilePointer(stream, offset, NULL, flag);
+}
+
+BOOL CloseStream(STREAM_HANDLE stream)
+{
+	return CloseHandle(stream);
+}
+
 Profile_Heapshot_Summary::Profile_Heapshot_Summary() :
 Profile_Block(),
 start_counter(0),
@@ -211,20 +260,20 @@ mapping(NULL)
 {
 }
 
-bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
-{
+bool Profile_Heapshot_Summary::InitFromStream(STREAM_HANDLE stream)
+{ 
 	if (!Profile_Block::InitFromStream(stream))
 		return false;
 
 	VERIFY_STREAM(stream);
 	ProfilerReaderUtil::ReadUInt64(stream, start_counter);
 	ProfilerReaderUtil::ReadUInt64(stream, start_time);
-	ProfilerReaderUtil::ReadUInt(stream, collection);
-
+	ProfilerReaderUtil::ReadUInt(stream, collection); 
 	while (1)
 	{
 		unsigned int class_id = 0;
-		ProfilerReaderUtil::ReadUInt(stream, class_id);
+		ProfilerReaderUtil::ReadUInt(stream, class_id); 
+
 		if (!class_id)
 			break;
 		Summary_Item item;
@@ -245,7 +294,7 @@ bool Profile_Heapshot_Summary::InitFromStream(FILE* stream)
 
 
 
-bool Profile_Block::InitFromStream(FILE* stream)
+bool Profile_Block::InitFromStream(STREAM_HANDLE stream)
 {
 	VERIFY_STREAM(stream);
 	ProfilerReaderUtil::ReadUShort(stream, code);
@@ -254,7 +303,7 @@ bool Profile_Block::InitFromStream(FILE* stream)
 	return true;
 }
 
-bool Profile_Raw_Block::InitFromStream(FILE* stream)
+bool Profile_Raw_Block::InitFromStream(STREAM_HANDLE stream)
 {
 	if (!Profile_Block::InitFromStream(stream))
 		return false;
@@ -294,7 +343,7 @@ Profile_Mapping_Block::~Profile_Mapping_Block()
 {
 }
 
-bool Profile_Mapping_Block::InitFromStream(FILE* stream)
+bool Profile_Mapping_Block::InitFromStream(STREAM_HANDLE stream)
 {
 	if (!Profile_Block::InitFromStream(stream))
 		return false;
@@ -349,7 +398,7 @@ Profile_Heapshot_Data_Block::~Profile_Heapshot_Data_Block()
 
 }
 
-bool Profile_Heapshot_Data_Block::InitFromStream(FILE* stream)
+bool Profile_Heapshot_Data_Block::InitFromStream(STREAM_HANDLE stream)
 {
 	if (!Profile_Block::InitFromStream(stream))
 		return false;
@@ -370,8 +419,8 @@ bool Profile_Heapshot_Data_Block::InitFromStream(FILE* stream)
 		ProfilerReaderUtil::ReadUInt(stream, code);
 		if (0 == code)
 			break;
-
-		fseek(stream, ftell(stream) - 4, SEEK_SET);
+		 
+		StreamSeek(stream, -4, FILE_CURRENT);
 		Profile_Object_Info obj_info;
 
 		if (!obj_info.InitFromStream(stream))
@@ -392,7 +441,7 @@ bool Profile_Heapshot_Data_Block::InitFromStream(FILE* stream)
 	return true;
 }
 
-bool Profile_Heapshot_Data_Block::Profile_Object_Info::InitFromStream(FILE* stream)
+bool Profile_Heapshot_Data_Block::Profile_Object_Info::InitFromStream(STREAM_HANDLE stream)
 {
 	VERIFY_STREAM(stream);
 
@@ -445,7 +494,7 @@ Profile_HeapShot_Data::~Profile_HeapShot_Data()
 	Clear();
 }
 
-void Profile_HeapShot_Data::InitFromStream(FILE* stream)
+void Profile_HeapShot_Data::InitFromStream(STREAM_HANDLE stream)
 {
 	Clear();
 
