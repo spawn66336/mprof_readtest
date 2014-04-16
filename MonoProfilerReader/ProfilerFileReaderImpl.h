@@ -203,6 +203,7 @@ public:
 protected:
 	void Clear();
 protected:
+	//¿‡”≥…‰±Ì
 	std::map<unsigned int, Profile_Mapping_Block::Class_Info> m_classMap;
 	std::vector<Profile_Block*> m_blocks;
 };

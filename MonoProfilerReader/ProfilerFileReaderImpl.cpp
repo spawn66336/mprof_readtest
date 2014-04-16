@@ -567,6 +567,8 @@ IHeapShot* Profile_HeapShot_Data::MakeHeapShotData()
 
 			auto insertRs =
 				pHeapShot->m_classMap.insert(std::make_pair(pClass->m_id, pClass));
+
+			//插入重复的类信息
 			if (!insertRs.second)
 			{
 				delete pClass;
