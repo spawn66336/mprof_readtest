@@ -39,6 +39,13 @@ public:
 	virtual void MoveFirstObject() = 0;
 	virtual void MoveNextObject() = 0;
 	virtual IObjectInfo* GetCurrObject() = 0;
+
+	//当前截面是否已经加载
+	virtual bool IsLoaded(void) const = 0;
+	//准备数据
+	virtual void PrepareData(void) = 0;
+	//清空载入的数据
+	virtual void ReleaseData(void) = 0;
 };
 
 class IHeapShot
@@ -47,10 +54,20 @@ public:
 	IHeapShot(){}
 	virtual ~IHeapShot(){}
 
+	//获取HeapShot文件名
+	virtual const char* GetFileName() const = 0;
+
 	virtual IHeapData* GetHeapDataByIndex( const unsigned int i ) const = 0;
 	virtual unsigned int GetHeapDataCount() const = 0;
 	virtual IClassInfo* GetClassInfoByID( const unsigned int id) const = 0;
 	virtual unsigned int GetClassInfoCount() const = 0;
+	 
+	// 更新当期那HeapShot
+	//   
+	// {注意事项}
+	// 此操作会更新HeapShot的类信息，若发现新的HeapData数据创建
+	// 新的HeapData实例对象。
+	virtual void Update(void) = 0;
 	
 };
 
@@ -63,6 +80,11 @@ public:
 	virtual IHeapShot* CreateHeapShotFromFile(const char* filename) = 0;
 	virtual unsigned int GetHeapShotCount() const = 0;
 	virtual IHeapShot* GetHeapShotByIndex(const unsigned int i) const = 0;
+
+	//更新HeapShot
+	virtual void _UpdateHeapShot(IHeapShot* pHeapShot) = 0;
+	//载入HeapData
+	virtual void _LoadHeapData(IHeapData* pHeapData) = 0;
 };
  
  

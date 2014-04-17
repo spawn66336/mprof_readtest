@@ -31,6 +31,73 @@ IHeapShot* ProfilerLoggingFileReader::CreateHeapShotFromFile(const char* filenam
 	return pHeapShot;
 }
 
+unsigned int ProfilerLoggingFileReader::ParseHeapShotFromFile(
+	const char* filename, 
+	unsigned int offset, 
+	std::vector<ClassParseInfo>& classes, 
+	std::vector<HeapDataParseInfo>& heapDataInfos)
+{
+	STREAM_HANDLE hFile = 0;
+	hFile = OpenReadStream(filename);
+
+	if (hFile == INVALID_HANDLE_VALUE)
+		return 0;
+
+	StreamSeek(hFile, offset, FILE_BEGIN); 
+	unsigned int newOffset = ProfilerReaderUtil::ParseHeapShot(hFile, classes, heapDataInfos);
+	CloseStream(hFile);
+	hFile = NULL;
+
+	return newOffset;
+}
+
+bool ProfilerLoggingFileReader::LoadHeapData(
+	const char* filename, 
+	unsigned int offset, 
+	HeapDataInfo& heapData)
+{
+	bool rs = false;
+	STREAM_HANDLE hFile = 0;
+	hFile = OpenReadStream(filename);
+
+	if (hFile == INVALID_HANDLE_VALUE)
+		return false;
+
+	StreamSeek(hFile, offset, FILE_BEGIN);
+	 
+	ProfilerLoggingBlockHeader header;
+	if (ProfilerReaderUtil::ReadBlockHeader(hFile,header))
+	{
+		if (header.m_type == MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA)
+		{
+			Profile_Heapshot_Data_Block* pHeapDataBlock = 
+				(Profile_Heapshot_Data_Block*)ProfilerReaderUtil::ReadBlock(hFile);
+			if (pHeapDataBlock)
+			{
+				auto itObj = pHeapDataBlock->objs.begin();
+				while (itObj != pHeapDataBlock->objs.end())
+				{
+					ObjectInfo objInfo;
+					objInfo.obj = (*itObj).second.obj;
+					objInfo.class_id = (*itObj).second.class_id;
+					objInfo.size = (*itObj).second.size;
+					objInfo.refs = (*itObj).second.refs;
+					heapData.objs.push_back(objInfo);
+					++itObj;
+				}
+
+				//释放HeapDataBlock
+				delete pHeapDataBlock;
+				pHeapDataBlock = NULL;
+				rs = true;
+			}
+		}
+	} 
+	CloseStream(hFile);
+	hFile = NULL;
+	return rs;
+}
+
 
 #define VERIFY_STREAM(s) do{\
 if ( !s || s == INVALID_HANDLE_VALUE || IsEOF(s)) return false;\
@@ -143,6 +210,107 @@ void ProfilerReaderUtil::SkipBlock(STREAM_HANDLE stream)
 	ReadUInt(stream, blockCounterDelta);
 	StreamSeek(stream, blockSize, FILE_CURRENT);
 }
+
+bool ProfilerReaderUtil::ReadBlockHeader(STREAM_HANDLE stream, ProfilerLoggingBlockHeader& header)
+{
+	//记录在读取文件头前的文件偏移
+	unsigned int prevOffset = StreamTell(stream);
+	bool rs = false;
+	rs = ReadUShort(stream, header.m_type);
+	rs = ReadUInt(stream, header.m_size);
+	rs = ReadUInt(stream, header.m_counter_data);
+	
+	//若读取头失败
+	if (!rs)
+	{
+		StreamSeek(stream, prevOffset, FILE_BEGIN);
+		return false;
+	}
+
+	//若文件头类型非法
+	if (header.m_type >= MONO_PROFILER_FILE_BLOCK_KIND_MAX)
+	{
+		StreamSeek(stream, prevOffset, FILE_BEGIN);
+		return false;
+	}
+
+	//计算剩余空间
+	DWORD surplusSize = StreamTotalSize(stream) - StreamTell(stream);
+
+	//若当前块的后续内容大小，小于文件
+	//剩余待读取区域大小则说明文件残缺
+	//返回失败
+	if (header.m_size > surplusSize)
+	{
+		StreamSeek(stream, prevOffset, FILE_BEGIN);
+		return false;
+	} 
+
+	StreamSeek(stream, prevOffset, FILE_BEGIN);
+	return true;
+}
+
+
+unsigned int ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos)
+{ 
+	if (NULL == stream || INVALID_HANDLE_VALUE == stream )
+		return 0;
+
+	if (IsEOF(stream))
+	{
+		return StreamTell(stream);
+	}
+
+	unsigned int currOffset = StreamTell(stream);
+
+	while (!IsEOF(stream))
+	{  
+		//在解析块前获取偏移
+		currOffset = StreamTell(stream);
+
+		ProfilerLoggingBlockHeader header;
+
+		if (!ReadBlockHeader(stream, header))
+		{//若块头解析失败或遇到非法块头则直接退出
+			return currOffset;
+		}
+
+		if (header.m_type == MONO_PROFILER_FILE_BLOCK_KIND_MAPPING)
+		{
+			Profile_Mapping_Block* pMapBlock = (Profile_Mapping_Block*)ReadBlock(stream);
+
+			//若Mapping块读取失败
+			if (!pMapBlock)
+			{
+				return currOffset;
+			}
+
+			auto itClass = pMapBlock->class_map.begin();
+			while (itClass != pMapBlock->class_map.end())
+			{
+				ClassParseInfo classInfo;
+				classInfo.m_id = itClass->second.class_id;
+				classInfo.m_name = itClass->second.class_name;
+				classes.push_back(classInfo);
+				++itClass;
+			}
+		}
+		else if (header.m_type == MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA){
+			HeapDataParseInfo heapDataInfo;
+			heapDataInfo.m_offset = StreamTell(stream);
+			heapDataInfos.push_back(heapDataInfo);
+
+			//略过此块
+			SkipBlock(stream);
+		}
+		else{//非感兴趣的块直接略过
+			SkipBlock(stream);
+		} 
+	}// while (!IsEOF(stream))
+
+	return currOffset;
+}
+
 
 
 std::string MonoProfilerFileBlockKindMap(unsigned int code)

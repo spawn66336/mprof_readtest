@@ -47,6 +47,11 @@ namespace MonoProfilerReaderBridge {
 		 void MoveFirstObject();
 		 void MoveNextObject();
 		 ObjectInfo^ GetCurrObject();
+
+		 bool IsLoaded();
+		 void PrepareData();
+		 void ReleaseData();
+
 	protected:
 		IHeapData* m_pHeapData;
 		Hashtable m_objs;
@@ -62,6 +67,8 @@ namespace MonoProfilerReaderBridge {
 		 unsigned int GetHeapDataCount() ;
 		 ClassInfo^ GetClassInfoByID(const unsigned int id);
 		 unsigned int GetClassInfoCount() ;
+
+		 void Update();
 
 	protected:
 		IHeapShot* m_pHeapShot;

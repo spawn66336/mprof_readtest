@@ -52,10 +52,20 @@ public:
 	virtual void MoveNextObject();
 	virtual IObjectInfo* GetCurrObject();
 
+	virtual bool IsLoaded(void) const;
+	virtual void PrepareData();
+	virtual void ReleaseData();
+
 	void Destroy(void);
 
 	typedef std::map<unsigned int, IObjectInfo*> ObjectTable_t;
-	ObjectTable_t m_objs;
+
+
+	IProfilerHeapShotManager* m_pMgr;
+	IHeapShot* m_pParent;   //指向所属HeapShot
+	unsigned int m_offset; //当前HeapData在文件中的偏移
+	bool		 m_loaded; //当前截面数据是否已经载入 
+	ObjectTable_t m_objs;  //对象表
 	ObjectTable_t::iterator m_currObj;
 };
 
@@ -65,13 +75,21 @@ public:
 	HeapShotImpl();
 	virtual ~HeapShotImpl();
 
+	virtual const char* GetFileName() const;
+
 	virtual IHeapData* GetHeapDataByIndex(const unsigned int i) const;
 	virtual unsigned int GetHeapDataCount() const;
 	virtual IClassInfo* GetClassInfoByID(const unsigned int id) const;
 	virtual unsigned int GetClassInfoCount() const;
 
+	virtual void Update(void); 
 	void Destroy();
 
+	IProfilerHeapShotManager* m_pMgr;
+
+	std::string m_filename; //HeapShot所属文件名
+	unsigned int m_offset;  //最后一次更新HeapShot的文件偏移
+	 
 	typedef std::vector<IHeapData*> HeapDataList_t;
 	HeapDataList_t m_heapDataList;
 
@@ -90,6 +108,8 @@ public:
 	virtual unsigned int GetHeapShotCount() const;
 	virtual IHeapShot* GetHeapShotByIndex( const unsigned int i) const;
 	
+	virtual void _UpdateHeapShot(IHeapShot* pHeapShot);
+	virtual void _LoadHeapData(IHeapData* pHeapData);
 	void Destroy();
 
 	typedef std::vector<IHeapShot*> HeapShotList_t;

@@ -67,7 +67,7 @@ void main()
 	IProfilerHeapShotManager* pHeapShotMgr =  CreateProfilerHeapShotManager();
 
 	IHeapShot* pHeapShot = 
-	pHeapShotMgr->CreateHeapShotFromFile("profiler-log.mprof");
+	pHeapShotMgr->CreateHeapShotFromFile("HeapShot_2014-4-16_13-2-0-365.mprof");
 	OutputHeapShotToFile("HeapShotReport.txt", pHeapShot);
 	DestroyProfilerHeapShotManager(pHeapShotMgr);
 	pHeapShotMgr = NULL;

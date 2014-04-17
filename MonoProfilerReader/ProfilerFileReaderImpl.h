@@ -173,6 +173,17 @@ public:
 
 Profile_Block* ProfileBlockFactory(unsigned int type);
 
+class ProfilerLoggingBlockHeader
+{
+public:
+	ProfilerLoggingBlockHeader():m_type(0),m_size(0),m_counter_data(0){}
+	~ProfilerLoggingBlockHeader(){}
+
+	unsigned short m_type;
+	unsigned int   m_size;
+	unsigned int   m_counter_data;
+};
+
 class ProfilerReaderUtil
 {
 public:
@@ -183,6 +194,22 @@ public:
 	static bool ReadString(STREAM_HANDLE stream, std::string& val);
 	static bool ReadBuffer(STREAM_HANDLE stream, void* buf, unsigned int size);
 	static Profile_Block* ReadBlock(STREAM_HANDLE stream);
+	
+	// 读取块头
+	//
+	// {参数}
+	// stream [in,out]: 待读取的流
+	// header [out]: 读取出的块头
+	// 
+	// {返回值}
+	// 若读取成功返回true,否则返回false。
+	// 读取成功是指块类型合法，块信息长度合法
+	// 也就是没超过文件的总大小。
+	// 
+	// {注意事项}
+	// 此函数在读取完头后会恢复流指针到读取之前
+	static bool ReadBlockHeader(STREAM_HANDLE stream, ProfilerLoggingBlockHeader& header);
+	static unsigned int ParseHeapShot(STREAM_HANDLE stream, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos);
 
 private:
 	static void SkipBlock(STREAM_HANDLE stream);
@@ -215,5 +242,8 @@ public:
 	ProfilerLoggingFileReader();
 	virtual ~ProfilerLoggingFileReader();
 
-	virtual IHeapShot* CreateHeapShotFromFile(const char* filename);
+	virtual IHeapShot* CreateHeapShotFromFile(const char* filename); 
+	virtual unsigned int ParseHeapShotFromFile(const char* filename, unsigned int offset, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos); 
+	virtual bool LoadHeapData(const char* filename, unsigned int offset, HeapDataInfo& heapdata);
+
 };

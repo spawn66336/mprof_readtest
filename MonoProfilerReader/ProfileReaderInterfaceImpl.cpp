@@ -69,12 +69,18 @@ bool ObjectInfoImpl::IsReachable() const
 }
 
 HeapDataImpl::HeapDataImpl()
+:m_pMgr(0),
+ m_pParent(0),
+ m_offset(0),
+ m_loaded(false)
 {
 
 }
 
 HeapDataImpl::~HeapDataImpl()
 {
+	m_pMgr = NULL;
+	m_pParent = NULL;
 	this->Destroy();
 }
 
@@ -119,6 +125,25 @@ IObjectInfo* HeapDataImpl::GetCurrObject()
 
 void HeapDataImpl::Destroy(void)
 {
+	ReleaseData();
+}
+
+bool HeapDataImpl::IsLoaded(void) const
+{
+	return m_loaded;
+}
+
+void HeapDataImpl::PrepareData()
+{
+	if (m_pMgr)
+	{
+		m_pMgr->_LoadHeapData(this);
+		m_loaded = true;
+	} 
+}
+
+void HeapDataImpl::ReleaseData()
+{
 	auto itObj = m_objs.begin();
 	while (itObj != m_objs.end())
 	{
@@ -127,16 +152,25 @@ void HeapDataImpl::Destroy(void)
 		++itObj;
 	}
 	m_objs.clear();
+	m_loaded = false;
 }
 
-HeapShotImpl::HeapShotImpl()
+HeapShotImpl::HeapShotImpl() :
+m_pMgr(0),
+m_offset(0)
 {
-
+	
 }
 
 HeapShotImpl::~HeapShotImpl()
 {
 	this->Destroy();
+}
+
+
+const char* HeapShotImpl::GetFileName() const
+{
+	return m_filename.c_str();
 }
 
 IHeapData* HeapShotImpl::GetHeapDataByIndex(const unsigned int i) const
@@ -189,6 +223,14 @@ void HeapShotImpl::Destroy()
 	m_classMap.clear();
 }
 
+void HeapShotImpl::Update()
+{
+	if (m_pMgr)
+	{
+		m_pMgr->_UpdateHeapShot(this);
+	}
+}
+
 ProfilerHeapShotManager::ProfilerHeapShotManager():
 m_pFileReader(NULL)
 {
@@ -202,15 +244,26 @@ ProfilerHeapShotManager::~ProfilerHeapShotManager()
 
 IHeapShot* ProfilerHeapShotManager::CreateHeapShotFromFile(const char* filename)
 {
-	IHeapShot* pNewHeapShot = m_pFileReader->CreateHeapShotFromFile(filename);
-	
+	HeapShotImpl* pNewHeapShot = new HeapShotImpl; 
 	if (pNewHeapShot)
 	{
+		pNewHeapShot->m_pMgr = this;
+		pNewHeapShot->m_filename = filename;
+		pNewHeapShot->m_offset = 0;
+		pNewHeapShot->Update();
+		 
+		//强制载入所有HeapData数据
+		//auto itHeapData = pNewHeapShot->m_heapDataList.begin();
+		//while (itHeapData != pNewHeapShot->m_heapDataList.end())
+		//{
+		//	(*itHeapData)->PrepareData();
+		//	++itHeapData;
+		//}
+
 		m_heapShotList.push_back(pNewHeapShot);
 		return pNewHeapShot;
-	}
-	else{
-		printf("无法打开文件：%s\n", filename);
+	}else{
+		printf("创建HeapShot对象失败！");
 	}
 	return NULL;
 }
@@ -245,6 +298,84 @@ void ProfilerHeapShotManager::Destroy()
 		++itHeapShot;
 	}
 	m_heapShotList.clear();
+}
+
+void ProfilerHeapShotManager::_UpdateHeapShot(IHeapShot* pHeapShot)
+{
+	if (NULL == pHeapShot)
+		return;
+
+	HeapShotImpl* pHeapShotImpl = (HeapShotImpl*)pHeapShot;
+	
+	std::vector<ClassParseInfo> classes;
+	std::vector<HeapDataParseInfo> heapDataInfos;
+
+	pHeapShotImpl->m_offset =  m_pFileReader->ParseHeapShotFromFile(
+		pHeapShotImpl->m_filename.c_str(), 
+		pHeapShotImpl->m_offset,
+		classes,heapDataInfos);
+
+	//记录类信息
+	auto itClass = classes.begin();
+	while (itClass != classes.end())
+	{
+		ClassInfoImpl* pNewClass = new ClassInfoImpl;
+		pNewClass->m_id = itClass->m_id;
+		pNewClass->m_name = itClass->m_name;
+		pHeapShotImpl->m_classMap.insert(std::make_pair(pNewClass->m_id, pNewClass));
+		++itClass;
+	}
+
+	//只生成新的堆截面对象，并将偏移信息记录在对象中
+	//并不实际读取数据，待后续实际使用堆截面数据时再
+	//载入
+	auto itHeapDataInfo = heapDataInfos.begin();
+	while (itHeapDataInfo != heapDataInfos.end())
+	{
+		HeapDataImpl* pNewHeapData = new HeapDataImpl;
+
+		pNewHeapData->m_pMgr = this;
+		pNewHeapData->m_pParent = pHeapShot;
+		pNewHeapData->m_loaded = false;
+		pNewHeapData->m_offset = itHeapDataInfo->m_offset;
+
+		pHeapShotImpl->m_heapDataList.push_back(pNewHeapData);
+		++itHeapDataInfo;
+	}
+
+}
+
+void ProfilerHeapShotManager::_LoadHeapData(IHeapData* pHeapData)
+{
+	if (NULL == pHeapData)
+		return;
+
+	HeapDataImpl* pHeapDataImpl = (HeapDataImpl*)pHeapData;
+
+	//若当前堆截面数据已经加载，则直接返回
+	if (pHeapDataImpl->m_loaded)
+		return;
+	
+	//加载截面对象数据
+	HeapDataInfo heapDataInfo;
+	if (m_pFileReader->LoadHeapData(
+		pHeapDataImpl->m_pParent->GetFileName(), 
+		pHeapDataImpl->m_offset, heapDataInfo))
+	{
+		auto itObj = heapDataInfo.objs.begin();
+		while (itObj != heapDataInfo.objs.end())
+		{
+			ObjectInfoImpl* pNewObj = new ObjectInfoImpl;
+			pNewObj->m_classID = itObj->class_id;
+			pNewObj->m_id = itObj->obj;
+			pNewObj->m_size = itObj->size;
+			pNewObj->m_refObjs = itObj->refs;
+			pNewObj->m_isReachable = true;
+
+			pHeapDataImpl->m_objs.insert(std::make_pair(pNewObj->m_id ,pNewObj));
+			++itObj;
+		}
+	}
 }
 
 

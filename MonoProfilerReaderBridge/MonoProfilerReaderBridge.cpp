@@ -91,6 +91,23 @@ MonoProfilerReaderBridge::ObjectInfo^ MonoProfilerReaderBridge::HeapData::GetCur
 	return nullptr;
 }
 
+bool MonoProfilerReaderBridge::HeapData::IsLoaded()
+{
+	return m_pHeapData->IsLoaded();
+}
+
+void MonoProfilerReaderBridge::HeapData::PrepareData()
+{
+	m_pHeapData->PrepareData();
+}
+
+void MonoProfilerReaderBridge::HeapData::ReleaseData()
+{
+	m_pHeapData->ReleaseData();
+}
+
+
+
 MonoProfilerReaderBridge::HeapData^ MonoProfilerReaderBridge::HeapShot::GetHeapDataByIndex(const unsigned int i)
 {
 	IHeapData* pHeapData = m_pHeapShot->GetHeapDataByIndex(i);
@@ -128,6 +145,11 @@ MonoProfilerReaderBridge::ClassInfo^ MonoProfilerReaderBridge::HeapShot::GetClas
 unsigned int MonoProfilerReaderBridge::HeapShot::GetClassInfoCount()
 {
 	return m_pHeapShot->GetClassInfoCount();
+}
+
+void MonoProfilerReaderBridge::HeapShot::Update()
+{
+	m_pHeapShot->Update();
 }
 
 MonoProfilerReaderBridge::ProfilerHeapShotManager::ProfilerHeapShotManager()
