@@ -4,6 +4,7 @@
 
 #include "MonoProfilerReaderBridge.h"
 #include <stdio.h>
+#include <vector>
 #include "Util.h"
 
 
@@ -107,6 +108,17 @@ void MonoProfilerReaderBridge::HeapData::ReleaseData()
 }
 
 
+MonoProfilerReaderBridge::HeapShot::HeapShot(IHeapShot* pHeapShot)
+{
+	m_pHeapShot = pHeapShot;
+
+	m_heapdatas = gcnew Hashtable();
+	m_classes = gcnew Hashtable();
+
+	//更新类列表
+	_UpdateClassTable();
+}
+
 
 MonoProfilerReaderBridge::HeapData^ MonoProfilerReaderBridge::HeapShot::GetHeapDataByIndex(const unsigned int i)
 {
@@ -114,7 +126,7 @@ MonoProfilerReaderBridge::HeapData^ MonoProfilerReaderBridge::HeapShot::GetHeapD
 	if (pHeapData)
 	{
 		unsigned int key = *((unsigned int*)(&pHeapData));
-		if (!m_heapdatas.ContainsKey(key))
+		if (!m_heapdatas->ContainsKey(key))
 		{
 			m_heapdatas[key] = gcnew HeapData(pHeapData);
 		}
@@ -133,13 +145,30 @@ MonoProfilerReaderBridge::ClassInfo^ MonoProfilerReaderBridge::HeapShot::GetClas
 	IClassInfo* pClass = m_pHeapShot->GetClassInfoByID(id);
 	if (pClass)
 	{
-		if (!m_classes.ContainsKey(pClass->GetID()))
+		if (!m_classes->ContainsKey(pClass->GetID()))
 		{
 			m_classes[pClass->GetID()] = gcnew ClassInfo(pClass);
 		}
 		return (ClassInfo^)m_classes[pClass->GetID()];
 	}
 	return nullptr;
+}
+
+void MonoProfilerReaderBridge::HeapShot::_UpdateClassTable()
+{
+	std::vector<IClassInfo*> classList;
+	m_pHeapShot->GetClassList(classList);
+
+	auto itClass = classList.begin();
+	while (itClass != classList.end())
+	{
+		IClassInfo* pClass = *itClass;
+		if (!m_classes->ContainsKey(pClass->GetID()))
+		{
+			m_classes[pClass->GetID()] = gcnew ClassInfo(pClass);
+		}
+		++itClass;
+	}
 }
 
 unsigned int MonoProfilerReaderBridge::HeapShot::GetClassInfoCount()
@@ -149,8 +178,12 @@ unsigned int MonoProfilerReaderBridge::HeapShot::GetClassInfoCount()
 
 void MonoProfilerReaderBridge::HeapShot::Update()
 {
-	m_pHeapShot->Update();
+	m_pHeapShot->Update(); 
+	_UpdateClassTable();
 }
+
+ 
+
 
 MonoProfilerReaderBridge::ProfilerHeapShotManager::ProfilerHeapShotManager()
 {
@@ -165,9 +198,7 @@ MonoProfilerReaderBridge::ProfilerHeapShotManager::~ProfilerHeapShotManager()
 
 MonoProfilerReaderBridge::HeapShot^ MonoProfilerReaderBridge::ProfilerHeapShotManager::CreateHeapShotFromFile(System::String^ filename)
 {
-
 	UMConverter con_filename(StringItem(filename).getBuf());
-
 	IHeapShot* pHeapShot = m_pMgr->CreateHeapShotFromFile(con_filename.GetMBCS());
 	if (pHeapShot)
 	{
@@ -186,6 +217,12 @@ unsigned int MonoProfilerReaderBridge::ProfilerHeapShotManager::GetHeapShotCount
 	return m_pMgr->GetHeapShotCount();
 }
 
+void MonoProfilerReaderBridge::ProfilerHeapShotManager::Clear()
+{
+	m_heapshots.Clear();
+	m_pMgr->Clear();
+}
+
 MonoProfilerReaderBridge::HeapShot^ MonoProfilerReaderBridge::ProfilerHeapShotManager::GetHeapShotByIndex(const unsigned int i)
 {
 	IHeapShot* pHeapShot = m_pMgr->GetHeapShotByIndex(i);
@@ -202,3 +239,4 @@ MonoProfilerReaderBridge::HeapShot^ MonoProfilerReaderBridge::ProfilerHeapShotMa
 
 
 
+ 

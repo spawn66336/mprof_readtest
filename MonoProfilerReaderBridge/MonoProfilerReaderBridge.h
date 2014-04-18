@@ -61,7 +61,7 @@ namespace MonoProfilerReaderBridge {
 	public ref class HeapShot
 	{
 	public:
-		HeapShot(IHeapShot* pHeapShot){ m_pHeapShot = pHeapShot; }
+		 HeapShot(IHeapShot* pHeapShot);
 
 		 HeapData^ GetHeapDataByIndex(const unsigned int i);
 		 unsigned int GetHeapDataCount() ;
@@ -69,11 +69,15 @@ namespace MonoProfilerReaderBridge {
 		 unsigned int GetClassInfoCount() ;
 
 		 void Update();
-
+		 Hashtable^ GetClassTable(){ return m_classes;  }
+	  
+	protected:
+		//更新类列表
+		void _UpdateClassTable();
 	protected:
 		IHeapShot* m_pHeapShot;
-		Hashtable m_heapdatas;
-		Hashtable m_classes;
+		Hashtable^ m_heapdatas;
+		Hashtable^ m_classes;
 	};
 
 	public ref class ProfilerHeapShotManager
@@ -85,6 +89,7 @@ namespace MonoProfilerReaderBridge {
 		 HeapShot^ CreateHeapShotFromFile(System::String^ filename);
 		 unsigned int GetHeapShotCount();
 		 HeapShot^ GetHeapShotByIndex(const unsigned int i);
+		 void Clear();
 	protected:
 		IProfilerHeapShotManager* m_pMgr;
 		Hashtable m_heapshots;

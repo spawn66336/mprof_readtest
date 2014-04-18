@@ -83,6 +83,7 @@ public:
 	virtual unsigned int GetClassInfoCount() const;
 
 	virtual void Update(void); 
+	virtual void GetClassList(std::vector<IClassInfo*>& classes);
 	void Destroy();
 
 	IProfilerHeapShotManager* m_pMgr;
@@ -107,6 +108,7 @@ public:
 	virtual IHeapShot* CreateHeapShotFromFile(const char* filename);
 	virtual unsigned int GetHeapShotCount() const;
 	virtual IHeapShot* GetHeapShotByIndex( const unsigned int i) const;
+	virtual void Clear();
 	
 	virtual void _UpdateHeapShot(IHeapShot* pHeapShot);
 	virtual void _LoadHeapData(IHeapData* pHeapData);

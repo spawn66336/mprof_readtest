@@ -197,6 +197,17 @@ IClassInfo* HeapShotImpl::GetClassInfoByID(const unsigned int id) const
 	return NULL;
 }
 
+void HeapShotImpl::GetClassList(std::vector<IClassInfo*>& classes)
+{
+	classes.clear();
+	auto itClass = m_classMap.begin();
+	while (itClass != m_classMap.end())
+	{
+		classes.push_back((*itClass).second);
+		++itClass;
+	}
+}
+
 unsigned int HeapShotImpl::GetClassInfoCount() const
 {
 	return m_classMap.size();
@@ -231,6 +242,8 @@ void HeapShotImpl::Update()
 	}
 }
 
+
+
 ProfilerHeapShotManager::ProfilerHeapShotManager():
 m_pFileReader(NULL)
 {
@@ -250,15 +263,7 @@ IHeapShot* ProfilerHeapShotManager::CreateHeapShotFromFile(const char* filename)
 		pNewHeapShot->m_pMgr = this;
 		pNewHeapShot->m_filename = filename;
 		pNewHeapShot->m_offset = 0;
-		pNewHeapShot->Update();
-		 
-		//强制载入所有HeapData数据
-		//auto itHeapData = pNewHeapShot->m_heapDataList.begin();
-		//while (itHeapData != pNewHeapShot->m_heapDataList.end())
-		//{
-		//	(*itHeapData)->PrepareData();
-		//	++itHeapData;
-		//}
+		pNewHeapShot->Update(); 
 
 		m_heapShotList.push_back(pNewHeapShot);
 		return pNewHeapShot;
@@ -282,14 +287,8 @@ IHeapShot* ProfilerHeapShotManager::GetHeapShotByIndex(const unsigned int i) con
 	return m_heapShotList.at(i);
 }
 
-void ProfilerHeapShotManager::Destroy()
+void ProfilerHeapShotManager::Clear()
 {
-	if (m_pFileReader)
-	{
-		delete m_pFileReader;
-		m_pFileReader = NULL;
-	}
-
 	auto itHeapShot = m_heapShotList.begin();
 	while (itHeapShot != m_heapShotList.end())
 	{
@@ -298,6 +297,19 @@ void ProfilerHeapShotManager::Destroy()
 		++itHeapShot;
 	}
 	m_heapShotList.clear();
+}
+
+void ProfilerHeapShotManager::Destroy()
+{
+	//清空所有内存截面数据
+	Clear();
+
+	if (m_pFileReader)
+	{
+		delete m_pFileReader;
+		m_pFileReader = NULL;
+	}
+
 }
 
 void ProfilerHeapShotManager::_UpdateHeapShot(IHeapShot* pHeapShot)
