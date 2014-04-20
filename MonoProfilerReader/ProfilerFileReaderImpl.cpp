@@ -215,10 +215,10 @@ bool ProfilerReaderUtil::ReadBlockHeader(STREAM_HANDLE stream, ProfilerLoggingBl
 {
 	//记录在读取文件头前的文件偏移
 	unsigned int prevOffset = StreamTell(stream);
-	bool rs = false;
-	rs = ReadUShort(stream, header.m_type);
-	rs = ReadUInt(stream, header.m_size);
-	rs = ReadUInt(stream, header.m_counter_data);
+	bool rs = true;
+	rs &= ReadUShort(stream, header.m_type);
+	rs &= ReadUInt(stream, header.m_size);
+	rs &= ReadUInt(stream, header.m_counter_data);
 	
 	//若读取头失败
 	if (!rs)
@@ -255,13 +255,15 @@ unsigned int ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector
 { 
 	if (NULL == stream || INVALID_HANDLE_VALUE == stream )
 		return 0;
-
+	 
 	if (IsEOF(stream))
 	{
-		return StreamTell(stream);
+		return StreamTotalSize(stream);
 	}
 
 	unsigned int currOffset = StreamTell(stream);
+
+	printf("currOffset = %d\n", currOffset);
 
 	while (!IsEOF(stream))
 	{  
@@ -308,6 +310,7 @@ unsigned int ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector
 		} 
 	}// while (!IsEOF(stream))
 
+	currOffset = StreamTell(stream);
 	return currOffset;
 }
 

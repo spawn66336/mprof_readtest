@@ -8,6 +8,10 @@
 #include "Util.h"
 
 
+MonoProfilerReaderBridge::ClassInfo::~ClassInfo()
+{
+	m_pClassInfo = NULL;
+}
 
 unsigned int MonoProfilerReaderBridge::ClassInfo::GetID()
 {
@@ -18,6 +22,13 @@ System::String^ MonoProfilerReaderBridge::ClassInfo::GetName()
 {
 	return gcnew System::String(m_pClassInfo->GetName());
 }
+
+
+MonoProfilerReaderBridge::ObjectInfo::~ObjectInfo()
+{
+	m_pObjectInfo = NULL;
+}
+
 
 unsigned int MonoProfilerReaderBridge::ObjectInfo::GetID()
 {
@@ -59,7 +70,7 @@ MonoProfilerReaderBridge::ObjectInfo^ MonoProfilerReaderBridge::HeapData::GetObj
 	IObjectInfo* pObj = NULL;
 	if (pObj = m_pHeapData->GetObjectByID(id))
 	{
-		if(!m_objs.ContainsKey(id))
+		if(!m_objs->ContainsKey(id))
 		{
 			m_objs[id] = gcnew ObjectInfo(pObj);
 		} 
@@ -67,6 +78,22 @@ MonoProfilerReaderBridge::ObjectInfo^ MonoProfilerReaderBridge::HeapData::GetObj
 	}
 	return nullptr;
 }
+
+
+MonoProfilerReaderBridge::HeapData::HeapData(IHeapData* pHeapData)
+{
+	m_pHeapData = pHeapData;
+	m_objs = gcnew Hashtable();
+
+}
+
+MonoProfilerReaderBridge::HeapData::~HeapData()
+{
+	m_pHeapData = NULL; 
+	m_objs->Clear();
+	m_objs = nullptr; 
+}
+
 
 void MonoProfilerReaderBridge::HeapData::MoveFirstObject()
 {
@@ -83,7 +110,7 @@ MonoProfilerReaderBridge::ObjectInfo^ MonoProfilerReaderBridge::HeapData::GetCur
 	IObjectInfo* pObj = m_pHeapData->GetCurrObject();
 	if (pObj)
 	{
-		if (!m_objs.ContainsKey(pObj->GetID()))
+		if (!m_objs->ContainsKey(pObj->GetID()))
 		{
 			m_objs[pObj->GetID()] = gcnew ObjectInfo(pObj);
 		}
@@ -117,6 +144,24 @@ MonoProfilerReaderBridge::HeapShot::HeapShot(IHeapShot* pHeapShot)
 
 	//更新类列表
 	_UpdateClassTable();
+}
+
+MonoProfilerReaderBridge::HeapShot::~HeapShot()
+{
+	m_pHeapShot = NULL;
+ 
+	m_heapdatas->Clear();
+	m_heapdatas = nullptr;
+
+ 
+	m_classes->Clear();
+	m_classes = nullptr;
+}
+
+
+System::String^ MonoProfilerReaderBridge::HeapShot::GetFilePath()
+{
+	return gcnew System::String(m_pHeapShot->GetFileName());
 }
 
 
@@ -182,17 +227,23 @@ void MonoProfilerReaderBridge::HeapShot::Update()
 	_UpdateClassTable();
 }
 
+
+
  
 
 
 MonoProfilerReaderBridge::ProfilerHeapShotManager::ProfilerHeapShotManager()
 {
 	m_pMgr = CreateProfilerHeapShotManager();
+	m_heapshots = gcnew Hashtable();
+
 }
 
 MonoProfilerReaderBridge::ProfilerHeapShotManager::~ProfilerHeapShotManager()
 {
+	Clear();
 	DestroyProfilerHeapShotManager(m_pMgr);
+	m_heapshots = nullptr;
 	m_pMgr = NULL;
 }
 
@@ -203,9 +254,9 @@ MonoProfilerReaderBridge::HeapShot^ MonoProfilerReaderBridge::ProfilerHeapShotMa
 	if (pHeapShot)
 	{
 		unsigned int key = *((unsigned int*)(&pHeapShot));
-		if (!m_heapshots.ContainsKey(key))
+		if (!m_heapshots->ContainsKey(key))
 		{
-			m_heapshots[key] = gcnew HeapShot(pHeapShot);
+			m_heapshots[key] = gcnew HeapShot(pHeapShot); 
 		}
 		return (HeapShot^)m_heapshots[key];
 	}
@@ -218,8 +269,9 @@ unsigned int MonoProfilerReaderBridge::ProfilerHeapShotManager::GetHeapShotCount
 }
 
 void MonoProfilerReaderBridge::ProfilerHeapShotManager::Clear()
-{
-	m_heapshots.Clear();
+{ 
+ 
+	m_heapshots->Clear();
 	m_pMgr->Clear();
 }
 
@@ -229,7 +281,7 @@ MonoProfilerReaderBridge::HeapShot^ MonoProfilerReaderBridge::ProfilerHeapShotMa
 	if (pHeapShot)
 	{
 		unsigned int key = *((unsigned int*)(&pHeapShot));
-		if (m_heapshots.ContainsKey(key))
+		if (m_heapshots->ContainsKey(key))
 		{
 			return (HeapShot^)m_heapshots[key];
 		}

@@ -12,7 +12,7 @@ namespace MonoProfilerReaderBridge {
 	{
 	public:
 		ClassInfo(IClassInfo* pClassInfo){ m_pClassInfo = pClassInfo; }
-
+		~ClassInfo();
 		 unsigned int GetID();
 		 System::String^ GetName();
 
@@ -24,6 +24,7 @@ namespace MonoProfilerReaderBridge {
 	{
 	public:
 		ObjectInfo(IObjectInfo* pObjInfo){ m_pObjectInfo = pObjInfo; }
+		~ObjectInfo();
 
 		 unsigned int GetID();
 		 unsigned int GetClassID();
@@ -39,7 +40,8 @@ namespace MonoProfilerReaderBridge {
 	public ref class HeapData
 	{
 	public:
-		HeapData(IHeapData* pHeapData){ m_pHeapData = pHeapData; }
+		HeapData(IHeapData* pHeapData);
+		~HeapData();
 
 		 unsigned int GetObjectCount();
 		 ObjectInfo^ GetObjectByID(const unsigned int id);
@@ -54,7 +56,7 @@ namespace MonoProfilerReaderBridge {
 
 	protected:
 		IHeapData* m_pHeapData;
-		Hashtable m_objs;
+		Hashtable^ m_objs;
 		
 	};
 
@@ -62,7 +64,9 @@ namespace MonoProfilerReaderBridge {
 	{
 	public:
 		 HeapShot(IHeapShot* pHeapShot);
+		 ~HeapShot();
 
+		 System::String^ GetFilePath();
 		 HeapData^ GetHeapDataByIndex(const unsigned int i);
 		 unsigned int GetHeapDataCount() ;
 		 ClassInfo^ GetClassInfoByID(const unsigned int id);
@@ -92,7 +96,7 @@ namespace MonoProfilerReaderBridge {
 		 void Clear();
 	protected:
 		IProfilerHeapShotManager* m_pMgr;
-		Hashtable m_heapshots;
+		Hashtable^ m_heapshots;
 	};
 
  

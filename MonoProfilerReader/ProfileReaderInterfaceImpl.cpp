@@ -198,8 +198,7 @@ IClassInfo* HeapShotImpl::GetClassInfoByID(const unsigned int id) const
 }
 
 void HeapShotImpl::GetClassList(std::vector<IClassInfo*>& classes)
-{
-	classes.clear();
+{ 
 	auto itClass = m_classMap.begin();
 	while (itClass != m_classMap.end())
 	{
@@ -327,6 +326,10 @@ void ProfilerHeapShotManager::_UpdateHeapShot(IHeapShot* pHeapShot)
 		pHeapShotImpl->m_offset,
 		classes,heapDataInfos);
 
+
+	printf("读取到%d个截面\n",heapDataInfos.size());
+
+	  
 	//记录类信息
 	auto itClass = classes.begin();
 	while (itClass != classes.end())
