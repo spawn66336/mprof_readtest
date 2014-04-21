@@ -207,6 +207,8 @@ void HeapShotImpl::GetClassList(std::vector<IClassInfo*>& classes)
 	}
 }
 
+ 
+
 unsigned int HeapShotImpl::GetClassInfoCount() const
 {
 	return m_classMap.size();
@@ -240,6 +242,8 @@ void HeapShotImpl::Update()
 		m_pMgr->_UpdateHeapShot(this);
 	}
 }
+
+
 
 
 
@@ -317,18 +321,26 @@ void ProfilerHeapShotManager::_UpdateHeapShot(IHeapShot* pHeapShot)
 		return;
 
 	HeapShotImpl* pHeapShotImpl = (HeapShotImpl*)pHeapShot;
-	
+	unsigned int newOffset = 0;
+	bool parseRs;
 	std::vector<ClassParseInfo> classes;
 	std::vector<HeapDataParseInfo> heapDataInfos;
 
-	pHeapShotImpl->m_offset =  m_pFileReader->ParseHeapShotFromFile(
+	parseRs = m_pFileReader->ParseHeapShotFromFile(
 		pHeapShotImpl->m_filename.c_str(), 
 		pHeapShotImpl->m_offset,
-		classes,heapDataInfos);
+		classes,heapDataInfos,
+		newOffset);
 
+	if (!parseRs)
+	{
+		printf("更新堆快照文件失败!\n");
+		return;
+	}
 
-	printf("读取到%d个截面\n",heapDataInfos.size());
+	pHeapShotImpl->m_offset = newOffset;
 
+	printf("New Offset=%d\n", pHeapShotImpl->m_offset);
 	  
 	//记录类信息
 	auto itClass = classes.begin();
@@ -340,6 +352,8 @@ void ProfilerHeapShotManager::_UpdateHeapShot(IHeapShot* pHeapShot)
 		pHeapShotImpl->m_classMap.insert(std::make_pair(pNewClass->m_id, pNewClass));
 		++itClass;
 	}
+
+	printf("New HeapData %d\n",heapDataInfos.size() );
 
 	//只生成新的堆截面对象，并将偏移信息记录在对象中
 	//并不实际读取数据，待后续实际使用堆截面数据时再

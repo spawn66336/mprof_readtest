@@ -209,14 +209,18 @@ public:
 	// {注意事项}
 	// 此函数在读取完头后会恢复流指针到读取之前
 	static bool ReadBlockHeader(STREAM_HANDLE stream, ProfilerLoggingBlockHeader& header);
-	static unsigned int ParseHeapShot(STREAM_HANDLE stream, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos);
+	static bool ParseHeapShot(STREAM_HANDLE stream, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos , unsigned int& newOffset );
 
 private:
 	static void SkipBlock(STREAM_HANDLE stream);
 
 };
  
+
 std::string MonoProfilerFileBlockKindMap(unsigned int code);
+
+//将每个块头名映射为中文
+std::string MonoProfilerFileBlockKindMap_Chinese(unsigned int code);
 
 class Profile_HeapShot_Data
 {
@@ -243,7 +247,13 @@ public:
 	virtual ~ProfilerLoggingFileReader();
 
 	virtual IHeapShot* CreateHeapShotFromFile(const char* filename); 
-	virtual unsigned int ParseHeapShotFromFile(const char* filename, unsigned int offset, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos); 
+	virtual bool ParseHeapShotFromFile(
+		const char* filename,
+		unsigned int offset,
+		std::vector<ClassParseInfo>& classes,
+		std::vector<HeapDataParseInfo>& heapDataInfos,
+		unsigned int& newOffset);
+
 	virtual bool LoadHeapData(const char* filename, unsigned int offset, HeapDataInfo& heapdata);
 
 };

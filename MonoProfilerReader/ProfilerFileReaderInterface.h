@@ -68,10 +68,15 @@ public:
 	// offset [in]: 从HeapShot文件的哪块解析
 	// classes [out]: 返回的类解析信息（从offset开始处往后的类信息）
 	// heapDataInfos [out]: 返回的HeapData解析信息（从offset开始往后的堆截面信息）
-	// 
+	// newOffset [out]: 新的偏移量（若解析成功的话此值有意义）
 	// {返回值}
-	// 返回当前读取到的文件字节偏移 
-	virtual unsigned int ParseHeapShotFromFile(const char* filename, unsigned int offset,std::vector<ClassParseInfo>& classes , std::vector<HeapDataParseInfo>& heapDataInfos ) = 0;
+	// 解析是否成功
+	virtual bool ParseHeapShotFromFile(
+		const char* filename, 
+		unsigned int offset,
+		std::vector<ClassParseInfo>& classes , 
+		std::vector<HeapDataParseInfo>& heapDataInfos ,
+		unsigned int& newOffset) = 0;
 
 	// 从指定位置处解析HeapData
 	//

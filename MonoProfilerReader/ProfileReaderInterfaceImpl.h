@@ -83,7 +83,7 @@ public:
 	virtual unsigned int GetClassInfoCount() const;
 
 	virtual void Update(void); 
-	virtual void GetClassList(std::vector<IClassInfo*>& classes);
+	virtual void GetClassList(std::vector<IClassInfo*>& classes); 
 	void Destroy();
 
 	IProfilerHeapShotManager* m_pMgr;

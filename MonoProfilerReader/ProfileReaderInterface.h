@@ -80,6 +80,7 @@ public:
 	// 中实例的生存周期由HeapShot来管理
 	// 
 	virtual void GetClassList(std::vector<IClassInfo*>& classes) = 0;
+	 
 	
 };
 

@@ -30,12 +30,13 @@ IHeapShot* ProfilerLoggingFileReader::CreateHeapShotFromFile(const char* filenam
 	}
 	return pHeapShot;
 }
-
-unsigned int ProfilerLoggingFileReader::ParseHeapShotFromFile(
+ 
+bool ProfilerLoggingFileReader::ParseHeapShotFromFile(
 	const char* filename, 
 	unsigned int offset, 
 	std::vector<ClassParseInfo>& classes, 
-	std::vector<HeapDataParseInfo>& heapDataInfos)
+	std::vector<HeapDataParseInfo>& heapDataInfos, 
+	unsigned int& newOffset)
 {
 	STREAM_HANDLE hFile = 0;
 	hFile = OpenReadStream(filename);
@@ -43,12 +44,13 @@ unsigned int ProfilerLoggingFileReader::ParseHeapShotFromFile(
 	if (hFile == INVALID_HANDLE_VALUE)
 		return 0;
 
-	StreamSeek(hFile, offset, FILE_BEGIN); 
-	unsigned int newOffset = ProfilerReaderUtil::ParseHeapShot(hFile, classes, heapDataInfos);
+	StreamSeek(hFile, offset, FILE_BEGIN);
+
+	bool parseRs = ProfilerReaderUtil::ParseHeapShot(hFile, classes, heapDataInfos,newOffset);
 	CloseStream(hFile);
 	hFile = NULL;
 
-	return newOffset;
+	return parseRs;
 }
 
 bool ProfilerLoggingFileReader::LoadHeapData(
@@ -181,7 +183,7 @@ Profile_Block* ProfilerReaderUtil::ReadBlock(STREAM_HANDLE stream)
 
 	//回退两个字节 
 	StreamSeek(stream, -2, FILE_CURRENT); 
-	printf("%s\n", MonoProfilerFileBlockKindMap(blockType).c_str());
+	printf("正在加载\"%s\"...\n", MonoProfilerFileBlockKindMap_Chinese(blockType).c_str());
 	Profile_Block* pBlock = ProfileBlockFactory(blockType);
 	if (!pBlock)
 	{
@@ -251,30 +253,30 @@ bool ProfilerReaderUtil::ReadBlockHeader(STREAM_HANDLE stream, ProfilerLoggingBl
 }
 
 
-unsigned int ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos)
-{ 
-	if (NULL == stream || INVALID_HANDLE_VALUE == stream )
+ 
+bool ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector<ClassParseInfo>& classes, std::vector<HeapDataParseInfo>& heapDataInfos, unsigned int& newOffset)
+{
+	if (NULL == stream || INVALID_HANDLE_VALUE == stream)
 		return 0;
-	 
+
 	if (IsEOF(stream))
 	{
-		return StreamTotalSize(stream);
+		return false;
 	}
 
-	unsigned int currOffset = StreamTell(stream);
-
-	printf("currOffset = %d\n", currOffset);
+	newOffset = StreamTell(stream);
 
 	while (!IsEOF(stream))
-	{  
+	{
 		//在解析块前获取偏移
-		currOffset = StreamTell(stream);
+		newOffset = StreamTell(stream);
 
 		ProfilerLoggingBlockHeader header;
 
 		if (!ReadBlockHeader(stream, header))
 		{//若块头解析失败或遇到非法块头则直接退出
-			return currOffset;
+			printf("读取到非法块头！\n");
+			return true;
 		}
 
 		if (header.m_type == MONO_PROFILER_FILE_BLOCK_KIND_MAPPING)
@@ -284,7 +286,7 @@ unsigned int ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector
 			//若Mapping块读取失败
 			if (!pMapBlock)
 			{
-				return currOffset;
+				return true;
 			}
 
 			auto itClass = pMapBlock->class_map.begin();
@@ -307,11 +309,11 @@ unsigned int ProfilerReaderUtil::ParseHeapShot(STREAM_HANDLE stream, std::vector
 		}
 		else{//非感兴趣的块直接略过
 			SkipBlock(stream);
-		} 
+		}
 	}// while (!IsEOF(stream))
 
-	currOffset = StreamTell(stream);
-	return currOffset;
+	newOffset = StreamTell(stream);
+	return true;
 }
 
 
@@ -355,6 +357,48 @@ std::string MonoProfilerFileBlockKindMap(unsigned int code)
 	}
 	return "KIND_UNKNOWN";
 }
+
+
+std::string MonoProfilerFileBlockKindMap_Chinese(unsigned int code)
+{
+	switch (code)
+	{
+	case MONO_PROFILER_FILE_BLOCK_KIND_INTRO:
+		return "简介块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_END:
+		return "结尾块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_MAPPING:
+		return "类信息块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_LOADED:
+		return "加载信息块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_UNLOADED:
+		return "卸载信息块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_EVENTS:
+		return "事件块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_STATISTICAL:
+		return "静态域块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_DATA:
+		return "堆截面块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_HEAP_SUMMARY:
+		return "堆截面总结块";
+		break;
+	case MONO_PROFILER_FILE_BLOCK_KIND_DIRECTIVES:
+		return "导向块";
+		break;
+	default:
+		break;
+	}
+	return "未知块";
+}
+
 
 Profile_Block* ProfileBlockFactory(unsigned int type)
 {
